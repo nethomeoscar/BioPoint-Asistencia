@@ -1,0 +1,10 @@
+{
+  "name": "AsistenciaFace",
+  "description": "Sistema ligero de control de asistencia con reconocimiento facial simulado, reportes y exportación a Excel.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

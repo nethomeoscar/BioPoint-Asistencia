@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedAdmin() {
+      // In this specific app, we trust users in the 'admins' collection or specific emails
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Employee Rules ---
+    match /employees/{employeeId} {
+      function isValidEmployee(data) {
+        return data.name is string && data.name.size() > 0 && data.name.size() <= 100
+            && data.department is string && data.department.size() <= 50;
+      }
+
+      allow read: if isSignedIn();
+      allow create, update: if isVerifiedAdmin() && isValidEmployee(incoming());
+      allow delete: if isVerifiedAdmin();
+    }
+
+    // --- Attendance Rules ---
+    match /attendance/{recordId} {
+      function isValidRecord(data) {
+        return data.name is string && data.name.size() <= 100
+            && data.type in ['Entrada', 'Salida']
+            && data.status in ['Reconocido', 'No reconocido']
+            && data.timestamp is number
+            && data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+            && data.time is string && data.time.matches('^\\d{2}:\\d{2}:\\d{2}$');
+      }
+
+      // Allow list only for signed in admins
+      allow list: if isVerifiedAdmin();
+      
+      // Allow write (create) for anyone with a face? 
+      // Actually, for security, let's say only authenticated "devices" (admins for now)
+      allow create: if isSignedIn() && isValidRecord(incoming());
+      
+      // No updates or deletes for attendance for integrity
+      allow get: if isVerifiedAdmin();
+    }
+
+    // --- Admins collection ---
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && request.auth.uid == adminId;
+      // Bootstrapped in production or manual setup
+    }
+  }
+}

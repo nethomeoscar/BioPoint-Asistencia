@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == "omicin@hotmail.com"
+      );
+    }
+
+    function getCompanyId() {
+      return "comp_" + request.auth.uid;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // --- Employee Rules ---
+    match /employees/{employeeId} {
+      function isValidEmployee(data) {
+        return data.keys().hasAll(['name', 'department', 'companyId']) 
+            && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+            && data.department is string && data.department.size() <= 100
+            && data.companyId is string
+            && (!data.keys().contains('shiftStart') || (data.shiftStart is string && data.shiftStart.matches('^\\d{2}:\\d{2}$')))
+            && (!data.keys().contains('shiftEnd') || (data.shiftEnd is string && data.shiftEnd.matches('^\\d{2}:\\d{2}$')))
+            && (!data.keys().contains('faceDescriptor') || data.faceDescriptor is list);
+      }
+
+      // Allow reading if you are the admin of that company
+      allow read: if isSignedIn() && (isVerifiedAdmin() ? resource.data.companyId == getCompanyId() : true);
+      
+      allow create: if isVerifiedAdmin() && isValidEmployee(incoming()) && incoming().companyId == getCompanyId();
+      allow update: if isVerifiedAdmin() && isValidEmployee(incoming()) && incoming().companyId == getCompanyId() && resource.data.companyId == getCompanyId();
+      allow delete: if isVerifiedAdmin() && resource.data.companyId == getCompanyId();
+    }
+
+    // --- Attendance Rules ---
+    match /attendance/{recordId} {
+      function isValidRecord(data) {
+        return data.keys().hasAll(['name', 'type', 'status', 'timestamp', 'date', 'time', 'companyId'])
+            && data.name is string && data.name.size() <= 100
+            && data.type in ['Entrada', 'Salida']
+            && data.status in ['Reconocido', 'No reconocido']
+            && data.timestamp is number
+            && data.companyId is string
+            && data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+            && data.time is string && data.time.matches('^\\d{2}:\\d{2}:\\d{2}$');
+      }
+
+      allow list: if isVerifiedAdmin() && resource.data.companyId == getCompanyId();
+      
+      allow create: if isSignedIn() && isValidRecord(incoming()) && (isVerifiedAdmin() ? incoming().companyId == getCompanyId() : true);
+      allow get: if isVerifiedAdmin() && resource.data.companyId == getCompanyId();
+      allow delete: if isVerifiedAdmin() && resource.data.companyId == getCompanyId();
+    }
+
+    // --- Admins collection ---
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && request.auth.uid == adminId;
+    }
+  }
+}
