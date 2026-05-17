@@ -29,8 +29,10 @@ import {
   getFirestore, 
   collection, 
   addDoc, 
+  setDoc,
   deleteDoc,
   getDocs, 
+  getDoc,
   query, 
   where,
   orderBy, 
@@ -43,6 +45,7 @@ import {
   signInWithPopup, 
   GoogleAuthProvider, 
   onAuthStateChanged,
+  signInAnonymously,
   signOut 
 } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -135,17 +138,59 @@ export default function App() {
 
   // Auth Listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
         setUser(u);
-        const derivedCompanyId = `comp_${u.uid}`;
-        setCompanyId(derivedCompanyId);
+        
+        // --- SaaS Multi-tenant Mapping ---
+        // Check if user already has a mapping
+        const userRef = doc(db, 'users', u.uid);
+        const userSnap = await getDoc(userRef);
+        
+        let targetCompanyId = '';
+        
+        if (!userSnap.exists()) {
+          // New User: Create mapping. By default, they get their own comp_UID
+          targetCompanyId = `comp_${u.uid}`;
+          await setDoc(userRef, {
+            uid: u.uid,
+            email: u.email || '',
+            companyId: targetCompanyId,
+            role: 'owner',
+            createdAt: new Date().toISOString()
+          });
+        } else {
+          targetCompanyId = userSnap.data().companyId;
+        }
+
+        setCompanyId(targetCompanyId);
+        
         // If we are in login view, go to dashboard
         if (view === 'login') setView('dashboard');
       } else {
         setUser(null);
-        // If we are not in kiosk mode, go to login
-        if (view !== 'kiosk') setView('login');
+        // If logged out but we have a paired company, try anonymous login for Kiosk mode
+        const pairedCid = localStorage.getItem('biopoint_companyId');
+        if (pairedCid && view === 'kiosk') {
+           try {
+             const anon = await signInAnonymously(auth);
+             // Ensure this anonymous UID is linked to the paired company
+             const kioskRef = doc(db, 'users', anon.user.uid);
+             const kioskSnap = await getDoc(kioskRef);
+             if (!kioskSnap.exists()) {
+               await setDoc(kioskRef, {
+                 companyId: pairedCid,
+                 role: 'kiosk',
+                 createdAt: new Date().toISOString()
+               });
+             }
+             setCompanyId(pairedCid);
+           } catch (e) {
+             console.error("Kiosk Auth Error", e);
+           }
+        } else {
+          if (view !== 'kiosk') setView('login');
+        }
       }
     });
     return unsubscribe;
@@ -214,9 +259,19 @@ export default function App() {
     setView('kiosk');
   };
 
-  const pairDevice = () => {
+  const pairDevice = async () => {
     if (companyId) {
       localStorage.setItem('biopoint_companyId', companyId);
+      // Create a kiosk record for this UID if it's currently anonymous 
+      // (Actually, the rules check the 'users' doc, so we must ensure a 'users' doc exists for the kiosk UID)
+      if (auth.currentUser) {
+        const kioskUserRef = doc(db, 'users', auth.currentUser.uid);
+        await setDoc(kioskUserRef, {
+          companyId: companyId,
+          role: 'kiosk',
+          pairedAt: new Date().toISOString()
+        }, { merge: true });
+      }
       alert("Dispositivo vinculado exitosamente a esta empresa.");
     }
   };
@@ -690,10 +745,11 @@ function CameraView({ onBack, employees, records, companyId, isKiosk, isModelsLo
           autoPlay 
           playsInline 
           muted 
-          className="w-full h-full object-cover rounded-[2rem]"
+          className="w-full h-full object-cover rounded-[2rem] contrast-125 brightness-110"
         />
         
         <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
           {status === 'scanning' && (
             <>
               <div className="scanner-line h-1 shadow-[0_0_20px_rgba(99,102,241,1)]" />
