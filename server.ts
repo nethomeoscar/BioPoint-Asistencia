@@ -7,7 +7,9 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
-
+  app.use(express.static('public'));
+  app.use(express.static('dist')); // Para los archivos compilados de React
+  
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", time: new Date().toISOString() });
