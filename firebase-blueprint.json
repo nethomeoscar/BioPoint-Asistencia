@@ -32,6 +32,30 @@
         "companyId": { "type": "string", "description": "Unique identifier for the organization" }
       },
       "required": ["name", "date", "time", "type", "status", "timestamp", "companyId"]
+    },
+    "Company": {
+      "title": "Company",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "plan": { "type": "string", "enum": ["free", "basic", "standard", "premium"] },
+        "trialEndsAt": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "plan", "trialEndsAt", "ownerUid"]
+    },
+    "User": {
+      "title": "User",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "companyId": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "admin", "kiosk"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "companyId", "role"]
     }
   },
   "firestore": {
@@ -42,6 +66,14 @@
     "/attendance/{recordId}": {
       "schema": "AttendanceRecord",
       "description": "Historical log of all attendance events."
+    },
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Subscription and tenant information."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and access control."
     }
   }
 }

@@ -9,71 +9,58 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isVerifiedAdmin() {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == "omicin@hotmail.com"
-      );
-    }
-
-    function getCompanyId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
-    }
-
     function incoming() {
       return request.resource.data;
     }
 
-    // --- Employee Rules ---
-    match /employees/{employeeId} {
-      function isValidEmployee(data) {
-        return data.keys().hasAll(['name', 'department', 'companyId']) 
-            && data.name is string && data.name.size() > 0 && data.name.size() <= 100
-            && data.department is string && data.department.size() <= 100
-            && data.companyId is string
-            && (!data.keys().contains('shiftStart') || (data.shiftStart is string && data.shiftStart.matches('^\\d{2}:\\d{2}$')))
-            && (!data.keys().contains('shiftEnd') || (data.shiftEnd is string && data.shiftEnd.matches('^\\d{2}:\\d{2}$')))
-            && (!data.keys().contains('faceDescriptor') || data.faceDescriptor is list);
-      }
-
-      // Both kiosks and admins can read employees of their own company
-      allow read: if isSignedIn() && resource.data.companyId == getCompanyId();
-      
-      allow create: if isVerifiedAdmin() && isValidEmployee(incoming()) && incoming().companyId == getCompanyId();
-      allow update: if isVerifiedAdmin() && isValidEmployee(incoming()) && incoming().companyId == getCompanyId() && resource.data.companyId == getCompanyId();
-      allow delete: if isVerifiedAdmin() && resource.data.companyId == getCompanyId();
+    function isVerified(cid) {
+      // Check if user belongs to this company
+      // Using path-based check is efficient for queries within subcollections
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == cid;
     }
 
-    // --- Attendance Rules ---
-    match /attendance/{recordId} {
-      function isValidRecord(data) {
-        return data.keys().hasAll(['name', 'type', 'status', 'timestamp', 'date', 'time', 'companyId'])
-            && data.name is string && data.name.size() <= 100
-            && data.type in ['Entrada', 'Salida']
-            && data.status in ['Reconocido', 'No reconocido']
-            && data.timestamp is number
-            && data.companyId is string
-            && data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
-            && data.time is string && data.time.matches('^\\d{2}:\\d{2}:\\d{2}$');
-      }
-
-      allow list: if isSignedIn() && resource.data.companyId == getCompanyId();
-      
-      allow create: if isSignedIn() && isValidRecord(incoming()) && incoming().companyId == getCompanyId();
-      allow get: if isSignedIn() && resource.data.companyId == getCompanyId();
-      allow delete: if isVerifiedAdmin() && resource.data.companyId == getCompanyId();
+    function isAdmin(cid) {
+       return isVerified(cid) && (
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' ||
+         request.auth.token.email == "omicin@hotmail.com"
+       );
     }
 
-    // --- Users collection (mapping uid to company) ---
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // --- Users collection (Global mapping) ---
     match /users/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;
-      // Allow creation if user is logging in for the first time
       allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() && request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['companyId', 'role', 'pairedAt']);
     }
 
-    // --- Admins collection ---
-    match /admins/{adminId} {
-      allow read: if isSignedIn() && request.auth.uid == adminId;
+    // --- Companies and their sub-data ---
+    match /companies/{cid} {
+      allow read: if isSignedIn() && (resource.data.ownerUid == request.auth.uid || isVerified(cid));
+      allow create: if isSignedIn() && incoming().ownerUid == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+
+      match /employees/{eid} {
+        allow read: if isVerified(cid);
+        allow write: if isAdmin(cid);
+      }
+
+      match /attendance/{rid} {
+        allow read, create: if isVerified(cid);
+        allow list: if isVerified(cid);
+        allow delete: if isAdmin(cid);
+      }
+    }
+
+    // --- Legacy / Global collections (to avoid breaking immediately) ---
+    match /employees/{eid} {
+      allow read, write: if isSignedIn() && (request.auth.token.email == "omicin@hotmail.com" || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == resource.data.companyId);
+    }
+    match /attendance/{rid} {
+      allow read, write: if isSignedIn() && (request.auth.token.email == "omicin@hotmail.com" || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == resource.data.companyId);
     }
   }
 }
