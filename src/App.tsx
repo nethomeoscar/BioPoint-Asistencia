@@ -151,6 +151,24 @@ export default function App() {
     return unsubscribe;
   }, [view]);
 
+  // Load Face Models
+  useEffect(() => {
+    const loadModels = async () => {
+      const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+      try {
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]);
+        setIsModelsLoaded(true);
+      } catch (err) {
+        console.error("Error loading face models:", err);
+      }
+    };
+    loadModels();
+  }, []);
+
   // Sync Records based on companyId
   useEffect(() => {
     if (!companyId) return;
@@ -214,6 +232,7 @@ export default function App() {
             companyId={companyId}
             onBack={() => setView('login')}
             isKiosk
+            isModelsLoaded={isModelsLoaded}
           />
         )}
 
@@ -244,6 +263,7 @@ export default function App() {
             records={records}
             companyId={companyId}
             onBack={() => setView('dashboard')} 
+            isModelsLoaded={isModelsLoaded}
           />
         )}
 
@@ -253,6 +273,7 @@ export default function App() {
             companyId={companyId}
             onBack={() => setView('dashboard')}
             onSuccess={() => setView('dashboard')}
+            isModelsLoaded={isModelsLoaded}
           />
         )}
 
@@ -461,7 +482,7 @@ function DashboardCard({ title, description, icon, onClick, className, iconClass
   );
 }
 
-function CameraView({ onBack, employees, records, companyId, isKiosk }: { onBack: () => void; employees: Employee[]; records: Record[]; companyId: string | null; isKiosk?: boolean; key?: string }) {
+function CameraView({ onBack, employees, records, companyId, isKiosk, isModelsLoaded }: { onBack: () => void; employees: Employee[]; records: Record[]; companyId: string | null; isKiosk?: boolean; isModelsLoaded: boolean; key?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<'idle' | 'scanning' | 'success' | 'failed'>('idle');
   const [result, setResult] = useState<Record | null>(null);
@@ -496,7 +517,7 @@ function CameraView({ onBack, employees, records, companyId, isKiosk }: { onBack
   }, []);
 
   const handleRecognition = async () => {
-    if (!videoRef.current || status !== 'scanning') return;
+    if (!videoRef.current || status !== 'scanning' || !isModelsLoaded) return;
 
     // Use TinyFaceDetector for performance
     const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
@@ -788,7 +809,7 @@ function CameraView({ onBack, employees, records, companyId, isKiosk }: { onBack
   );
 }
 
-function RegisterView({ onBack, onSuccess, companyId }: { onBack: () => void; onSuccess: () => void; companyId: string | null; key?: string }) {
+function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded }: { onBack: () => void; onSuccess: () => void; companyId: string | null; isModelsLoaded: boolean; key?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [name, setName] = useState('');
   const [dept, setDept] = useState('');
@@ -814,7 +835,7 @@ function RegisterView({ onBack, onSuccess, companyId }: { onBack: () => void; on
   }, [companyId]);
 
   const handleCapture = async () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || !isModelsLoaded) return;
     setIsCapturing(true);
     try {
       const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
