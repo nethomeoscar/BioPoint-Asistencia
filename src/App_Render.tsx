@@ -23,8 +23,7 @@ import {
   ShieldCheck,
   Zap,
   Clock,
-  ExternalLink,
-  Download
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -139,24 +138,6 @@ export default function App() {
   const [isModelsLoaded, setIsModelsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-
-  // Load Models
-  useEffect(() => {
-    const loadModels = async () => {
-      try {
-        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-        ]);
-        setIsModelsLoaded(true);
-      } catch (err) {
-        console.error("Error loading models", err);
-      }
-    };
-    loadModels();
-  }, []);
 
   // Connection Test
   useEffect(() => {
@@ -1175,7 +1156,7 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
   );
 }
 
-function EmployeesListView({ employees, onBack, companyId }: { employees: Employee[]; onBack: () => void; companyId: string | null; key?: string }) {
+function EmployeesListView({ employees, onBack, companyId }: { employees: Employee[]; onBack: () => void; companyId: string; key?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
 
@@ -1310,7 +1291,7 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
   );
 }
 
-function DataTableView({ records, onBack, onDelete, companyId }: { records: Record[]; onBack: () => void; onDelete: (id: string) => void; companyId: string | null; key?: string }) {
+function DataTableView({ records, onBack, onDelete, companyId }: { records: Record[]; onBack: () => void; onDelete: (id: string) => void; companyId: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
@@ -1475,7 +1456,7 @@ function DataTableView({ records, onBack, onDelete, companyId }: { records: Reco
   );
 }
 
-function TutorialView({ onBack }: { onBack: () => void; key?: string }) {
+function TutorialView({ onBack }: { onBack: () => void }) {
   const tutorials = [
     {
       title: "Configuración Inicial",
@@ -1563,7 +1544,7 @@ function TutorialView({ onBack }: { onBack: () => void; key?: string }) {
   );
 }
 
-function PricingView({ companyData, companyId, onBack }: { companyData: any; companyId: string | null; onBack: () => void; key?: string }) {
+function PricingView({ companyData, companyId, onBack }: { companyData: any; companyId: string | null; onBack: () => void }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const plans = [
     {
