@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "lint": "tsc --noEmit"
   },
@@ -22,14 +22,15 @@
     "express": "^4.21.2",
     "face-api.js": "^0.22.2",
     "firebase": "^12.13.0",
+    "firebase-admin": "^13.10.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "stripe": "^22.1.1",
     "tailwind-merge": "^3.6.0",
     "vite": "^6.2.3",
-    "xlsx": "^0.18.5",
-    "stripe": "^15.12.0"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
@@ -39,6 +40,7 @@
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
-    "typescript": "~5.8.2"
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
   }
 }
