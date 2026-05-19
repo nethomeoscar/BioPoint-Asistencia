@@ -61,19 +61,27 @@
   "firestore": {
     "/employees/{employeeId}": {
       "schema": "Employee",
-      "description": "Collection of registered employees."
+      "description": "Legacy/Global collection of registered employees."
     },
     "/attendance/{recordId}": {
       "schema": "AttendanceRecord",
-      "description": "Historical log of all attendance events."
+      "description": "Legacy/Global historical log of all attendance events."
     },
     "/companies/{companyId}": {
       "schema": "Company",
       "description": "Subscription and tenant information."
     },
+    "/companies/{companyId}/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Collection of registered employees for a specific company."
+    },
+    "/companies/{companyId}/attendance/{recordId}": {
+      "schema": "AttendanceRecord",
+      "description": "Historical log of all attendance events for a specific company."
+    },
     "/users/{userId}": {
       "schema": "User",
-      "description": "User profile and access control."
+      "description": "User profile and access control mapping."
     }
   }
 }

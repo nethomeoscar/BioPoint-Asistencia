@@ -23,8 +23,7 @@ import {
   ShieldCheck,
   Zap,
   Clock,
-  ExternalLink,
-  Download
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -63,9 +62,7 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  firestoreDatabaseId: import.meta.env.VITE_FIRESTORE_DATABASE_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Face API Imports
@@ -114,7 +111,7 @@ interface Record {
   department: string;
   date: string;
   time: string;
-  type: 'Entrada' | 'Salida' | 'N/A';
+  type: 'Entrada' | 'Salida';
   status: 'Reconocido' | 'No reconocido';
   punctuality?: 'A Tiempo' | 'Retraso' | 'Temprano' | 'Normal';
   timestamp: number;
@@ -142,27 +139,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Load Models
-  useEffect(() => {
-    const loadModels = async () => {
-      try {
-        // Use official weights from the author
-        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-        ]);
-        console.log("FaceAPI Models Loaded successfully from official source");
-        setIsModelsLoaded(true);
-      } catch (err) {
-        console.error("Error loading models", err);
-        // Fallback or retry?
-      }
-    };
-    loadModels();
-  }, []);
-
   // Connection Test
   useEffect(() => {
     async function testConnection() {
@@ -181,71 +157,56 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
-        setIsLoading(true);
+        setUser(u);
+        
+        // --- SaaS Multi-tenant Mapping ---
         const userRef = doc(db, 'users', u.uid);
         const userSnap = await getDoc(userRef);
-        const pairedCid = localStorage.getItem('biopoint_companyId');
         
         let targetCompanyId = '';
+        
+        if (!userSnap.exists()) {
+          targetCompanyId = `comp_${u.uid}`;
+          const trialEnds = addDays(new Date(), 15).toISOString();
+          
+          await setDoc(doc(db, 'companies', targetCompanyId), {
+            name: `Empresa de ${u.displayName || 'Usuario'}`,
+            plan: 'free',
+            trialEndsAt: trialEnds,
+            ownerUid: u.uid,
+            createdAt: new Date().toISOString()
+          });
 
-        if (u.isAnonymous) {
-          // Anonymous Kiosk Logic
-          if (pairedCid) {
-            targetCompanyId = pairedCid;
-            if (!userSnap.exists() || userSnap.data().companyId !== pairedCid) {
-              await setDoc(userRef, {
-                uid: u.uid,
-                companyId: pairedCid,
-                role: 'kiosk',
-                createdAt: new Date().toISOString()
-              }, { merge: true });
-              // Force server sync check
-              await getDocFromServer(userRef);
-            }
-          } else if (view === 'kiosk') {
-             // Should not happen if kiosk mode is requested but no CID
-             console.warn("Kiosk mode without paired company ID");
-          }
+          await setDoc(userRef, {
+            uid: u.uid,
+            email: u.email || '',
+            companyId: targetCompanyId,
+            role: 'owner',
+            createdAt: new Date().toISOString()
+          });
         } else {
-          // Regular Authenticated User (Google/Email)
-          if (!userSnap.exists()) {
-            targetCompanyId = `comp_${u.uid}`;
-            const trialEnds = addDays(new Date(), 15).toISOString();
-            
-            await setDoc(doc(db, 'companies', targetCompanyId), {
-              name: `Empresa de ${u.displayName || 'Usuario'}`,
-              plan: 'free',
-              trialEndsAt: trialEnds,
-              ownerUid: u.uid,
-              createdAt: new Date().toISOString()
-            });
-
-            await setDoc(userRef, {
-              uid: u.uid,
-              email: u.email || '',
-              companyId: targetCompanyId,
-              role: 'owner',
-              createdAt: new Date().toISOString()
-            });
-            // Force server sync check
-            await getDocFromServer(userRef);
-          } else {
-            targetCompanyId = userSnap.data().companyId;
-          }
+          targetCompanyId = userSnap.data().companyId;
         }
 
-        if (targetCompanyId) {
-          setCompanyId(targetCompanyId);
-          if (view === 'login') setView('dashboard');
-        }
-        setUser(u);
-        setIsLoading(false);
+        setCompanyId(targetCompanyId);
+        
+        if (view === 'login') setView('dashboard');
       } else {
         setUser(null);
         const pairedCid = localStorage.getItem('biopoint_companyId');
         if (pairedCid && view === 'kiosk') {
            try {
-             await signInAnonymously(auth);
+             const anon = await signInAnonymously(auth);
+             const kioskRef = doc(db, 'users', anon.user.uid);
+             const kioskSnap = await getDoc(kioskRef);
+             if (!kioskSnap.exists()) {
+               await setDoc(kioskRef, {
+                 companyId: pairedCid,
+                 role: 'kiosk',
+                 createdAt: new Date().toISOString()
+               });
+             }
+             setCompanyId(pairedCid);
            } catch (e: any) {
              console.error("Kiosk Auth Error", e);
              if (e.code === 'auth/admin-restricted-operation') {
@@ -262,59 +223,39 @@ export default function App() {
 
   // Sync Company Data
   useEffect(() => {
-    if (!companyId || !user) return;
+    if (!companyId || !auth.currentUser) return;
     const unsub = onSnapshot(doc(db, 'companies', companyId), (snap) => {
       if (snap.exists()) setCompanyData(snap.data());
     });
     return unsub;
-  }, [companyId, user]);
+  }, [companyId]);
 
   // Sync Records based on companyId
   useEffect(() => {
-    if (!companyId || !user) return;
-
-    console.log(`Syncing records for company: ${companyId} as user: ${user.uid}`);
+    if (!companyId || !auth.currentUser) return;
 
     const qRecords = query(
-      collection(db, 'attendance'), 
+      collection(db, 'companies', companyId, 'attendance'), 
       where('companyId', '==', companyId),
       orderBy('timestamp', 'desc')
     );
     const unsubRecords = onSnapshot(qRecords, (snap) => {
       setRecords(snap.docs.map(d => ({ id: d.id, ...d.data() } as Record)));
-    }, (error) => {
-      console.warn("Retrying records sync due to potential rules latency...");
-      setTimeout(() => {
-        if (companyId && user) {
-          onSnapshot(qRecords, (s) => setRecords(s.docs.map(d => ({ id: d.id, ...d.data() } as Record))), (err) => handleFirestoreError(err, OperationType.LIST, `attendance`));
-        }
-      }, 2000);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `companies/${companyId}/attendance`));
 
     const qEmployees = query(
-      collection(db, 'employees'),
+      collection(db, 'companies', companyId, 'employees'),
       where('companyId', '==', companyId)
     );
     const unsubEmployees = onSnapshot(qEmployees, (snap) => {
-      const emps = snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee));
-      setEmployees(emps.sort((a, b) => a.name.localeCompare(b.name)));
-    }, (error) => {
-       console.warn("Retrying employees sync due to potential rules latency...");
-       setTimeout(() => {
-         if (companyId && user) {
-           onSnapshot(qEmployees, (s) => {
-             const emps = s.docs.map(d => ({ id: d.id, ...d.data() } as Employee));
-             setEmployees(emps.sort((a, b) => a.name.localeCompare(b.name)));
-           }, (err) => handleFirestoreError(err, OperationType.LIST, `employees`));
-         }
-       }, 2000);
-    });
+      setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `companies/${companyId}/employees`));
 
     return () => {
       unsubRecords();
       unsubEmployees();
     };
-  }, [companyId, user]);
+  }, [companyId]);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -340,18 +281,14 @@ export default function App() {
     if (companyId) {
       localStorage.setItem('biopoint_companyId', companyId);
       if (auth.currentUser) {
-        // Only update role to kiosk if it's not owner/admin
-        const userRef = doc(db, 'users', auth.currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists() && userSnap.data().role !== 'owner' && userSnap.data().role !== 'admin') {
-          await setDoc(userRef, {
-            companyId: companyId,
-            role: 'kiosk',
-            pairedAt: new Date().toISOString()
-          }, { merge: true });
-        }
+        const kioskUserRef = doc(db, 'users', auth.currentUser.uid);
+        await setDoc(kioskUserRef, {
+          companyId: companyId,
+          role: 'kiosk',
+          pairedAt: new Date().toISOString()
+        }, { merge: true });
       }
-      alert("Dispositivo vinculado exitosamente a esta empresa como Kiosco.");
+      alert("Dispositivo vinculado exitosamente a esta empresa.");
     }
   };
 
@@ -823,8 +760,7 @@ function CameraView({ onBack, onTutorials, employees, records, companyId, isKios
       };
 
       try {
-        console.log("Saving attendance record:", newRecord);
-        await addDoc(collection(db, 'attendance'), newRecord);
+        await addDoc(collection(db, 'companies', companyId, 'attendance'), newRecord);
         setResult(newRecord);
         setStatus('success');
         if (stream) stream.getTracks().forEach(t => t.stop());
@@ -836,18 +772,7 @@ function CameraView({ onBack, onTutorials, employees, records, companyId, isKios
           setResult(null);
         }, 3000);
       } catch (err) {
-        console.error("Attendance creation failed, retrying once...");
-        // Wait a bit and retry if it's a permission error (could be rules latency)
-        setTimeout(async () => {
-          try {
-             await addDoc(collection(db, 'attendance'), newRecord);
-             setResult(newRecord);
-             setStatus('success');
-             if (stream) if (videoRef.current?.srcObject instanceof MediaStream) (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-          } catch (retryErr) {
-             handleFirestoreError(retryErr, OperationType.CREATE, 'attendance');
-          }
-        }, 1500);
+        handleFirestoreError(err, OperationType.CREATE, 'attendance');
       }
     } else {
       // After some time if no match, we can mark as failed
@@ -874,13 +799,13 @@ function CameraView({ onBack, onTutorials, employees, records, companyId, isKios
       department: '—',
       date: format(now, "yyyy-MM-dd"),
       time: format(now, "HH:mm:ss"),
-      type: 'N/A',
+      type: 'Entrada',
       status: 'No reconocido',
       timestamp: Date.now(),
       companyId: companyId!
     };
     try {
-      await addDoc(collection(db, 'attendance'), failRecord);
+      await addDoc(collection(db, 'companies', companyId || 'unknown', 'attendance'), failRecord);
       setStatus('failed');
       if (stream) stream.getTracks().forEach(t => t.stop());
 
@@ -1082,50 +1007,33 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
     return () => stream?.getTracks().forEach(t => t.stop());
   }, [companyId, isLocked]);
 
-  useEffect(() => {
-    if (stream && videoRef.current && !videoRef.current.srcObject) {
-      videoRef.current.srcObject = stream;
-    }
-  }, [stream]);
-
   const handleCapture = async () => {
-    if (!videoRef.current || !isModelsLoaded || isLocked) {
-      if (!isModelsLoaded) alert("Espera a que los modelos carguen...");
-      return;
-    }
+    if (!videoRef.current || !isModelsLoaded || isLocked) return;
     setIsCapturing(true);
     try {
-      console.log("Detecting face...");
-      const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+      const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptor();
       
       if (detection) {
-        console.log("Face detected!");
         setCapturedDescriptor(Array.from(detection.descriptor));
       } else {
-        alert("No se detectó rostro. Asegúrate de estar frente a la cámara y con buena iluminación.");
+        alert("No se detectó rostro. Intenta de nuevo.");
       }
     } catch (err) {
-      console.error("Capture Error:", err);
-      alert("Error al capturar rostro: " + (err instanceof Error ? err.message : String(err)));
+      console.error(err);
     } finally {
       setIsCapturing(false);
     }
   };
 
   const handleSave = async () => {
-    if (!name || !dept || !capturedDescriptor || !companyId) {
-      alert("Por favor completa todos los campos y captura el rostro.");
-      return;
-    }
-    if (isLocked) return;
-    
+    if (!name || !dept || !capturedDescriptor || !companyId || isLocked) return;
     setIsCapturing(true);
     try {
-      await addDoc(collection(db, 'employees'), {
-        name: name.trim(),
-        department: dept.trim(),
+      await addDoc(collection(db, 'companies', companyId, 'employees'), {
+        name,
+        department: dept,
         shiftStart,
         shiftEnd,
         faceDescriptor: capturedDescriptor,
@@ -1139,8 +1047,6 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
       setIsCapturing(false);
     }
   };
-
-  const isFormValid = name.trim() !== '' && dept.trim() !== '' && capturedDescriptor !== null;
 
   return (
     <motion.div 
@@ -1239,18 +1145,7 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
             ) : (
               <div className="flex gap-4">
                  <button onClick={() => setCapturedDescriptor(null)} className="flex-1 py-4 bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl font-bold active:scale-95 transition-all text-xs uppercase tracking-widest">Reiniciar</button>
-                 <button 
-                  onClick={handleSave} 
-                  disabled={!isFormValid || isCapturing} 
-                  className={cn(
-                    "flex-1 py-4 rounded-2xl font-bold transition-all text-xs uppercase tracking-widest",
-                    isFormValid && !isCapturing 
-                      ? "bg-emerald-600 text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95" 
-                      : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  )}
-                >
-                  Guardar Empleado
-                </button>
+                 <button onClick={handleSave} disabled={isCapturing} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all text-xs uppercase tracking-widest">Guardar Empleado</button>
               </div>
             )}
           </div>
@@ -1261,7 +1156,7 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
   );
 }
 
-function EmployeesListView({ employees, onBack, companyId }: { employees: Employee[]; onBack: () => void; companyId: string | null; key?: string }) {
+function EmployeesListView({ employees, onBack, companyId }: { employees: Employee[]; onBack: () => void; companyId: string; key?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
 
@@ -1270,7 +1165,7 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
   const handleDelete = async (id: string) => {
     if (confirm('¿Estás seguro de eliminar a este empleado? Se perderán sus datos biométricos.')) {
       try {
-        await deleteDoc(doc(db, 'employees', id));
+        await deleteDoc(doc(db, 'companies', companyId, 'employees', id));
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, 'employees');
       }
@@ -1345,7 +1240,7 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs uppercase">
-                        {emp.name ? emp.name.charAt(0) : '?'}
+                        {emp.name.charAt(0)}
                       </div>
                       <span className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{emp.name}</span>
                     </div>
@@ -1380,7 +1275,7 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={5} className="px-8 py-24 text-center">
+                  <td colSpan={3} className="px-8 py-24 text-center">
                     <div className="flex flex-col items-center gap-3">
                        <Filter className="w-10 h-10 text-slate-200" />
                        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No se encontraron empleados</p>
@@ -1396,7 +1291,7 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
   );
 }
 
-function DataTableView({ records, onBack, onDelete, companyId }: { records: Record[]; onBack: () => void; onDelete: (id: string) => void; companyId: string | null; key?: string }) {
+function DataTableView({ records, onBack, onDelete, companyId }: { records: Record[]; onBack: () => void; onDelete: (id: string) => void; companyId: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
@@ -1426,7 +1321,7 @@ function DataTableView({ records, onBack, onDelete, companyId }: { records: Reco
   const handleDelete = async (id: string) => {
     if (confirm('¿Estás seguro de eliminar este registro?')) {
       try {
-        await deleteDoc(doc(db, 'attendance', id));
+        await deleteDoc(doc(db, 'companies', companyId, 'attendance', id));
         onDelete(id);
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, 'attendance');
@@ -1561,7 +1456,7 @@ function DataTableView({ records, onBack, onDelete, companyId }: { records: Reco
   );
 }
 
-function TutorialView({ onBack }: { onBack: () => void; key?: string }) {
+function TutorialView({ onBack }: { onBack: () => void }) {
   const tutorials = [
     {
       title: "Configuración Inicial",
@@ -1649,7 +1544,7 @@ function TutorialView({ onBack }: { onBack: () => void; key?: string }) {
   );
 }
 
-function PricingView({ companyData, companyId, onBack }: { companyData: any; companyId: string | null; onBack: () => void; key?: string }) {
+function PricingView({ companyData, companyId, onBack }: { companyData: any; companyId: string | null; onBack: () => void }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const plans = [
     {
