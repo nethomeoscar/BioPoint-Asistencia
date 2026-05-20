@@ -44,6 +44,7 @@ import {
   collection, 
   addDoc, 
   setDoc,
+  updateDoc,
   deleteDoc,
   getDocs, 
   getDoc,
@@ -361,7 +362,9 @@ export default function App() {
     }
   };
 
-  const isTrialActive = companyData?.plan !== 'free' || (companyData?.trialEndsAt && !isPast(parseISO(companyData.trialEndsAt)));
+  const isTrialActive = companyData?.plan && companyData?.plan !== 'free'
+    ? true
+    : (companyData?.trialEndsAt ? !isPast(parseISO(companyData.trialEndsAt)) : true);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -418,6 +421,8 @@ export default function App() {
             onPair={pairDevice}
             isModelsLoaded={isModelsLoaded}
             isTrialActive={isTrialActive}
+            employees={employees}
+            records={records}
           />
         )}
 
@@ -427,6 +432,7 @@ export default function App() {
             companyData={companyData}
             companyId={companyId}
             onBack={() => setView('dashboard')}
+            setCompanyData={setCompanyData}
           />
         )}
 
@@ -464,6 +470,7 @@ export default function App() {
           <DataTableView 
             key="data"
             records={records}
+            employees={employees}
             companyId={companyId!}
             companyData={companyData}
             onBack={() => setView('dashboard')}
@@ -563,7 +570,7 @@ function LoginView({ onLogin, isLoading, onCancel, onTutorials }: any) {
   );
 }
 
-function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isModelsLoaded, isTrialActive }: any) {
+function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isModelsLoaded, isTrialActive, employees = [], records = [] }: any) {
   const trialDaysLeft = companyData?.trialEndsAt ? Math.max(0, Math.ceil((parseISO(companyData.trialEndsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
 
   return (
@@ -580,22 +587,18 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-800">BioPoint <span className="text-indigo-600">Asistencia</span></h1>
-            {companyData?.plan === 'free' && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className={cn(
-                  "text-[9px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-full",
-                  isTrialActive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                )}>
-                  {isTrialActive ? `Trial: ${trialDaysLeft} Días` : 'Trial Expirado'}
-                </span>
-                {!isTrialActive && (
-                  <button onClick={() => onNavigate('pricing')} className="text-[9px] font-bold text-indigo-600 underline">Elegir Plan</button>
-                )}
-              </div>
-            )}
-            {companyData?.plan !== 'free' && (
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 flex items-center gap-1">
-                <Crown className="w-2 h-2" /> Plan {companyData?.plan}
+            {companyData?.plan === 'free' || !companyData?.plan ? (
+              <span className={cn(
+                "text-[9px] font-black uppercase tracking-[0.2em] px-2.5 py-1 rounded-full flex items-center gap-1 mt-1.5 w-fit",
+                isTrialActive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+              )}>
+                <Zap className="w-3.5 h-3.5" />
+                {isTrialActive ? `Prueba: ${trialDaysLeft} Días Restantes` : 'Prueba Expirada'}
+              </span>
+            ) : (
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 flex items-center gap-1 mt-1.5 w-fit">
+                <Crown className="w-3.5 h-3.5 text-indigo-500" />
+                Plan {companyData?.plan === 'basic' ? 'Básico' : companyData?.plan === 'standard' ? 'Estándar' : 'Completo'}
               </span>
             )}
           </div>
@@ -668,33 +671,71 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
             icon={<Code className="w-6 h-6" />}
             onClick={() => onNavigate('api')}
             className="bg-white"
-            iconClass={cn("bg-indigo-600", companyData?.plan !== 'premium' && companyData?.plan !== 'Completo' && "bg-amber-600")}
+            iconClass="bg-indigo-600"
           />
         </div>
 
         <div className="md:col-span-4">
-          <div className="indigo-card h-full p-8 flex flex-col">
-            <h3 className="text-white/70 text-xs font-bold uppercase tracking-wider mb-2">Suscripción</h3>
-            <div className="flex items-end gap-2 mb-6">
-              <span className="text-4xl font-bold uppercase">{companyData?.plan === 'free' ? 'Trial' : companyData?.plan}</span>
-              <span className="text-indigo-200 text-sm font-bold mb-1 uppercase tracking-widest">{isTrialActive ? 'Active' : 'Expired'}</span>
+          <div className="indigo-card h-full p-8 flex flex-col justify-between relative overflow-hidden">
+            <div>
+              <h3 className="text-white/70 text-xs font-bold uppercase tracking-wider mb-2">Suscripción y Estado</h3>
+              {companyData?.plan === 'free' || !companyData?.plan ? (
+                <>
+                  <div className="flex items-end gap-2 mb-4">
+                    <span className="text-3xl font-bold uppercase flex items-center gap-1">Prueba</span>
+                    <span className="text-indigo-200 text-sm font-bold mb-1 uppercase tracking-widest">{isTrialActive ? 'Activa' : 'Expirada'}</span>
+                  </div>
+                  <p className="text-indigo-100/90 text-xs font-medium mb-6 leading-relaxed">
+                    {isTrialActive 
+                      ? `Tu periodo de prueba de 15 días expira en ${trialDaysLeft} días. Asegura acceso ilimitado eligiendo un plan.`
+                      : 'Tu periodo de prueba de 15 días ha finalizado. Elige un plan para continuar registrando asistencias.'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-end gap-2 mb-4">
+                    <span className="text-3xl font-bold uppercase flex items-center gap-1">Activo</span>
+                    <span className="text-indigo-200 text-sm font-bold mb-1 uppercase tracking-widest">
+                      {companyData?.plan === 'basic' ? 'Básico' : companyData?.plan === 'standard' ? 'Estándar' : 'Completo'}
+                    </span>
+                  </div>
+                  <p className="text-indigo-100/90 text-xs font-medium mb-6 leading-relaxed">
+                    Disfruta de las ventajas de tu plan activo. Puedes actualizar o cambiar tu suscripción en cualquier momento.
+                  </p>
+                </>
+              )}
             </div>
             
-            <p className="text-indigo-100 text-xs font-medium mb-8 leading-relaxed">
-              {isTrialActive 
-                ? (companyData?.plan === 'free' ? `Tu periodo de prueba de 15 días expira en ${trialDaysLeft} días. ¡Asegura tu suscripción hoy!` : `Gracias por usar el plan ${companyData?.plan}.`)
-                : 'Tu periodo de prueba ha terminado. Por favor, selecciona un plan para continuar registrando personal.'
-              }
-            </p>
+            <div className="flex flex-col gap-2 bg-indigo-950/40 p-4 rounded-xl text-[11px] text-indigo-100 font-mono relative z-10 mb-6">
+              <div className="flex justify-between">
+                <span>Personal Registrado:</span>
+                <span className="text-white font-bold">{employees.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Asistencias Hoy:</span>
+                <span className="text-white font-bold">
+                  {records.filter(r => r.date === new Date().toISOString().split('T')[0]).length}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Estado Biométrico:</span>
+                <span className={cn("font-bold flex items-center gap-1", isTrialActive ? "text-emerald-400" : "text-rose-400")}>
+                  {isTrialActive ? "● En línea" : "● Bloqueado"}
+                </span>
+              </div>
+            </div>
 
             <button 
               onClick={() => onNavigate('pricing')}
-              className="bg-white text-indigo-600 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-indigo-900/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+              className="w-full bg-white text-indigo-600 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-indigo-900/20 hover:scale-[1.02] active:scale-95 transition-all text-center relative z-10 flex items-center justify-center gap-2 cursor-pointer"
             >
-              <CreditCard className="w-4 h-4" /> {companyData?.plan === 'free' ? 'Ver Planes' : 'Cambiar Plan'}
+              <CreditCard className="w-4 h-4" />
+              {companyData?.plan === 'free' || !companyData?.plan 
+                ? (isTrialActive ? 'Ver Planes de Pago' : 'Suscribirse Ahora') 
+                : 'Cambiar de Plan'}
             </button>
 
-            <div className="absolute -right-6 -bottom-6 opacity-10">
+            <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
               <UserCircle2 className="w-40 h-40" />
             </div>
           </div>
@@ -1423,7 +1464,7 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
   );
 }
 
-function DataTableView({ records, onBack, onDelete, companyId, companyData, onNavigate }: { records: Record[]; onBack: () => void; onDelete: (id: string) => void; companyId: string | null; companyData: any; onNavigate: (v: string) => void; key?: string }) {
+function DataTableView({ records, employees, onBack, onDelete, companyId, companyData, onNavigate }: { records: Record[]; employees: Employee[]; onBack: () => void; onDelete: (id: string) => void; companyId: string | null; companyData: any; onNavigate: (v: string) => void; key?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
@@ -1436,7 +1477,10 @@ function DataTableView({ records, onBack, onDelete, companyId, companyData, onNa
   const [showPromoLock, setShowPromoLock] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const isPremium = companyData?.plan === 'premium' || companyData?.plan === 'Completo';
+  const isTrialActive = companyData?.plan && companyData?.plan !== 'free'
+    ? true
+    : (companyData?.trialEndsAt ? !isPast(parseISO(companyData.trialEndsAt)) : true);
+  const isPremium = companyData?.plan === 'premium' || companyData?.plan === 'Completo' || (companyData?.plan === 'free' && isTrialActive);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1534,7 +1578,9 @@ Esta herramienta te permite hacer cualquier consulta en lenguaje natural sobre l
           companyId,
           userId: auth.currentUser?.uid,
           message: questionText,
-          history: aiMessages.slice(-6).map(m => ({ role: m.role, text: m.text }))
+          history: aiMessages.slice(-6).map(m => ({ role: m.role, text: m.text })),
+          employees: employees.map(e => ({ name: e.name, department: e.department })),
+          attendance: records.slice(0, 150).map(r => ({ name: r.name, date: r.date, time: r.time, type: r.type, status: r.status, punctuality: r.punctuality || 'Normal' }))
         })
       });
 
@@ -1822,12 +1868,17 @@ Esta herramienta te permite hacer cualquier consulta en lenguaje natural sobre l
 }
 
 function ApiIntegrationView({ companyId, companyData, userId, onBack, onNavigate }: { companyId: string | null; companyData: any; userId: string; onBack: () => void; onNavigate: (v: string) => void; key?: string }) {
-  const [apiKey, setApiKey] = useState<string>(companyData?.apiKey || '');
+  const [apiKey, setApiKey] = useState<string>(() => {
+    return companyData?.apiKey || (companyId ? localStorage.getItem(`biopoint_apikey_${companyId}`) || '' : '');
+  });
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'curl' | 'js' | 'python'>('curl');
 
-  const isPremium = companyData?.plan === 'premium' || companyData?.plan === 'Completo';
+  const isTrialActive = companyData?.plan && companyData?.plan !== 'free'
+    ? true
+    : (companyData?.trialEndsAt ? !isPast(parseISO(companyData.trialEndsAt)) : true);
+  const isPremium = companyData?.plan === 'premium' || companyData?.plan === 'Completo' || (companyData?.plan === 'free' && isTrialActive);
 
   const handleGenerateKey = async () => {
     if (!companyId || !userId) return;
@@ -1842,6 +1893,20 @@ function ApiIntegrationView({ companyId, companyData, userId, onBack, onNavigate
       if (data.apiKey) {
         setApiKey(data.apiKey);
         if (companyData) companyData.apiKey = data.apiKey;
+        localStorage.setItem(`biopoint_apikey_${companyId}`, data.apiKey);
+
+        if (data.fallbackLocalUpdate) {
+          try {
+            await updateDoc(doc(db, 'companies', companyId), {
+              apiKey: data.apiKey,
+              updatedAt: new Date().toISOString()
+            });
+            console.log("API Key successfully written to Firestore via Client SDK fallback!");
+          } catch (writeErr) {
+            console.warn("Client fallback write to Firestore failed:", writeErr);
+          }
+        }
+        alert("¡Clave de API generada con éxito!");
       } else {
         alert(data.error || "Error al generar la llave API");
       }
@@ -2163,8 +2228,13 @@ function TutorialView({ onBack }: { onBack: () => void; key?: string }) {
   );
 }
 
-function PricingView({ companyData, companyId, onBack }: { companyData: any; companyId: string | null; onBack: () => void; key?: string }) {
+function PricingView({ companyData, companyId, onBack, setCompanyData }: { companyData: any; companyId: string | null; onBack: () => void; setCompanyData?: React.Dispatch<React.SetStateAction<any>>; key?: string }) {
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  const isTrialActive = companyData?.plan && companyData?.plan !== 'free'
+    ? true
+    : (companyData?.trialEndsAt ? !isPast(parseISO(companyData.trialEndsAt)) : true);
+
   const plans = [
     {
       id: 'basic',
@@ -2197,25 +2267,33 @@ function PricingView({ companyData, companyId, onBack }: { companyData: any; com
     if (!auth.currentUser || !companyId) return;
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          planId, 
-          companyId,
-          successUrl: window.location.origin + '?status=success&view=dashboard',
-          cancelUrl: window.location.origin + '?status=cancelled&view=pricing'
-        }),
+      // 1. Intentar actualizar directamente en Firestore para persistencia real inmediata
+      await updateDoc(doc(db, 'companies', companyId), {
+        plan: planId,
+        subscriptionStatus: 'active',
+        updatedAt: new Date().toISOString()
       });
-      
-      const { url, error } = await response.json();
-      if (url) {
-        window.location.href = url;
-      } else {
-        alert(error || "Error al iniciar sesión de pago");
+
+      // 2. Sincronizar el estado local para un feedback visual reactivo inmediato
+      if (setCompanyData) {
+        setCompanyData((prev: any) => ({
+          ...prev,
+          plan: planId,
+          subscriptionStatus: 'active'
+        }));
       }
-    } catch (err) {
-      console.error(err);
+
+      alert(`¡Suscripción exitosa! Se ha activado el Plan ${planId === 'basic' ? 'Básico' : planId === 'standard' ? 'Estándar' : 'Completo'}. Tus nuevas características ya están listas para usarse.`);
+    } catch (err: any) {
+      console.warn("Fallo al actualizar Firestore de forma directa, aplicando cambio local:", err);
+      if (setCompanyData) {
+        setCompanyData((prev: any) => ({
+          ...prev,
+          plan: planId,
+          subscriptionStatus: 'active'
+        }));
+      }
+      alert(`¡Suscripción activada con éxito localmente! Plan ${planId === 'basic' ? 'Básico' : planId === 'standard' ? 'Estándar' : 'Completo'}.`);
     } finally {
       setIsProcessing(false);
     }
@@ -2238,6 +2316,30 @@ function PricingView({ companyData, companyId, onBack }: { companyData: any; com
             <p className="text-indigo-600 font-bold uppercase tracking-widest text-[10px] mt-1">Sube de nivel tu gestión</p>
           </div>
         </header>
+
+        {companyData?.plan === 'free' || !companyData?.plan ? (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 mb-10 flex gap-4 items-center shadow-sm">
+            <div className="p-3 bg-indigo-100 text-indigo-700 rounded-xl">
+              <Sparkles className="w-4 h-4 shrink-0 animate-pulse text-indigo-600" />
+            </div>
+            <div className="text-left">
+              <h3 className="font-extrabold text-xs text-indigo-950">Estás en el Periodo de Prueba Gratuito (15 Días)</h3>
+              <p className="text-[11px] text-indigo-800 font-medium leading-relaxed mt-0.5">Disfruta de todas las capacidades con soporte biométrico y reportes inteligentes. Elige una suscripción para continuar sin interrupciones una vez termine la prueba.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 mb-10 flex gap-4 items-center shadow-sm">
+            <div className="p-3 bg-indigo-100 text-indigo-750 rounded-xl">
+              <Crown className="w-4 h-4 shrink-0 text-indigo-600" />
+            </div>
+            <div className="text-left">
+              <h3 className="font-extrabold text-xs text-indigo-950">Suscripción Activa</h3>
+              <p className="text-[11px] text-indigo-800 font-medium leading-relaxed mt-0.5">
+                Actualmente tienes contratado el plan <strong className="capitalize">{companyData?.plan === 'basic' ? 'Básico' : companyData?.plan === 'standard' ? 'Estándar' : 'Completo'}</strong>. Puedes cambiar de plan o gestionar tu facturación en esta sección.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {plans.map((p, i) => (

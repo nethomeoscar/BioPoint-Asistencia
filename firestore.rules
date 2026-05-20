@@ -74,7 +74,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && (isVerified(cid) || resource.data.ownerUid == request.auth.uid);
       allow create: if isSignedIn() && incoming().ownerUid == request.auth.uid && isValidCompany(incoming());
       allow update: if isSignedIn() && resource.data.ownerUid == request.auth.uid && 
-        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'plan', 'subscriptionStatus', 'stripeSubscriptionId', 'updatedAt']);
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'plan', 'subscriptionStatus', 'stripeSubscriptionId', 'updatedAt', 'apiKey']);
 
       function isValidCompany(data) {
         return data.keys().hasAll(['name', 'plan', 'ownerUid']) &&
