@@ -333,7 +333,7 @@ Instrucciones de análisis:
         line_items: [
           {
             price_data: {
-              currency: 'usd',
+              currency: 'mxn',
               product_data: {
                 name: `BioPoint ${planId.charAt(0).toUpperCase() + planId.slice(1)} Plan`,
               },
