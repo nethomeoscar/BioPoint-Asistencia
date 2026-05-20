@@ -24,7 +24,13 @@ import {
   Zap,
   Clock,
   ExternalLink,
-  Download
+  Download,
+  Code,
+  Sparkles,
+  Send,
+  Key,
+  Copy,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -459,8 +465,21 @@ export default function App() {
             key="data"
             records={records}
             companyId={companyId!}
+            companyData={companyData}
             onBack={() => setView('dashboard')}
+            onNavigate={(v) => setView(v)}
             onDelete={(id) => setRecords(prev => prev.filter(r => r.id !== id))}
+          />
+        )}
+
+        {view === 'api' && (
+          <ApiIntegrationView 
+            key="api"
+            companyId={companyId}
+            companyData={companyData}
+            userId={user?.uid || ""}
+            onBack={() => setView('dashboard')}
+            onNavigate={(v) => setView(v)}
           />
         )}
 
@@ -642,6 +661,14 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
             onClick={() => onNavigate('register')}
             className={cn("bg-white", !isTrialActive && "opacity-50 grayscale cursor-not-allowed")}
             iconClass="bg-indigo-600"
+          />
+          <DashboardCard 
+            title="API & Integraciones"
+            description="Gestiona llaves de acceso y conecta sistemas externos o ERPs."
+            icon={<Code className="w-6 h-6" />}
+            onClick={() => onNavigate('api')}
+            className="bg-white"
+            iconClass={cn("bg-indigo-600", companyData?.plan !== 'premium' && companyData?.plan !== 'Completo' && "bg-amber-600")}
           />
         </div>
 
@@ -1396,9 +1423,24 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
   );
 }
 
-function DataTableView({ records, onBack, onDelete, companyId }: { records: Record[]; onBack: () => void; onDelete: (id: string) => void; companyId: string | null; key?: string }) {
+function DataTableView({ records, onBack, onDelete, companyId, companyData, onNavigate }: { records: Record[]; onBack: () => void; onDelete: (id: string) => void; companyId: string | null; companyData: any; onNavigate: (v: string) => void; key?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  // AI Assistant States
+  const [aiInput, setAiInput] = useState('');
+  const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([
+    { role: 'model', text: '👋 ¡Hola! Soy tu analista de asistencia BioPoint AI. Hazme preguntas sobre puntualidad, registros o tendencias de tus empleados.' }
+  ]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [showPromoLock, setShowPromoLock] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const isPremium = companyData?.plan === 'premium' || companyData?.plan === 'Completo';
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [aiMessages, isAiLoading]);
 
   const filteredRecords = records.filter(r => {
     const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -1434,6 +1476,95 @@ function DataTableView({ records, onBack, onDelete, companyId }: { records: Reco
     }
   };
 
+  const handleAiQuestion = async (questionText: string) => {
+    if (isAiLoading) return;
+    
+    if (!isPremium) {
+      // Demo response simulation for non-premium users
+      setIsAiLoading(true);
+      setAiMessages(prev => [...prev, { role: 'user', text: questionText }]);
+      
+      setTimeout(() => {
+        setIsAiLoading(false);
+        const demoResponses: { [key: string]: string } = {
+          "¿Quién ha tenido más retrasos esta semana?": `✨ **Demostración de Reportes AI (Plan Completo)**:
+
+Basado en tus registros de asistencia actuales:
+- El empleado **Sofía Rodríguez** (Ventas) registra **2 retrasos** esta semana con un promedio de 14 minutos tarde.
+- El empleado **Alex Gómez** (Sistemas) registra **1 retraso** el día Lunes.
+
+*Adquiere el **Plan Completo** para realizar consultas libres sobre cualquier fecha y persona.*`,
+          "Resume las estadísticas por departamento": `✨ **Demostración de Reportes AI (Plan Completo)**:
+
+Tu reporte resumido de puntualidad por departamentos muestra:
+1. **Sistemas**: 98% de puntualidad, sin retrasos o ausencias recurrentes.
+2. **Ventas**: 74% de puntualidad, con concentración de llegadas tarde los Lunes por la mañana.
+3. **Administración**: 90% de puntualidad.
+
+*Conecta tus registros reales con el poder analítico libre de Gemini.*`,
+          "¿Cuáles son los días con mejor asistencia?": `✨ **Demostración de Reportes AI (Plan Completo)**:
+
+El análisis semanal de ausentismo destaca:
+- Los **Martes y Jueves** presentan el **100% de cumplimiento** en hora de ingreso.
+- Los **Lunes** tienen un pico de retrasos promedio de 12 minutos.
+
+*Usa estos reportes de tendencias para optimizar tus horarios corporativos.*`
+        };
+
+        const replyText = demoResponses[questionText] || `✨ **Función Exclusiva del Plan Completo**:
+
+Esta herramienta te permite hacer cualquier consulta en lenguaje natural sobre la asistencia de tu equipo, entregándote análisis predictivo y resúmenes estructurados al instante.
+
+¡Actualiza hoy tu suscripción para desbloquear el poder de Gemini analizando tus recursos humanos!`;
+
+        setAiMessages(prev => [...prev, { role: 'model', text: replyText }]);
+      }, 1500);
+      return;
+    }
+
+    // Active Premium AI Query!
+    setIsAiLoading(true);
+    setAiMessages(prev => [...prev, { role: 'user', text: questionText }]);
+
+    try {
+      const response = await fetch('/api/gemini/report-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          userId: auth.currentUser?.uid,
+          message: questionText,
+          history: aiMessages.slice(-6).map(m => ({ role: m.role, text: m.text }))
+        })
+      });
+
+      const data = await response.json();
+      if (data.text) {
+        setAiMessages(prev => [...prev, { role: 'model', text: data.text }]);
+      } else {
+        setAiMessages(prev => [...prev, { role: 'model', text: `⚠️ Error del Analista AI: ${data.error || "No se pudo obtener respuesta."}` }]);
+      }
+    } catch (err: any) {
+      setAiMessages(prev => [...prev, { role: 'model', text: '⚠️ Error de conexión al consultar el analista AI.' }]);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  const handleAiSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiInput.trim() || isAiLoading) return;
+    
+    if (!isPremium) {
+      setShowPromoLock(true);
+      return;
+    }
+
+    const question = aiInput;
+    setAiInput('');
+    handleAiQuestion(question);
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -1447,7 +1578,7 @@ function DataTableView({ records, onBack, onDelete, companyId }: { records: Reco
           </button>
           <div>
             <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Reportes de Asistencia</h2>
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Nube de registros históricos</p>
+            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Registros Históricos & Analista AI</p>
           </div>
         </div>
 
@@ -1459,103 +1590,486 @@ function DataTableView({ records, onBack, onDelete, companyId }: { records: Reco
         </button>
       </header>
 
-      <div className="grid md:grid-cols-3 gap-6 mb-10">
-        <div className="md:col-span-1 border border-slate-100 bg-white p-2 rounded-2xl shadow-sm flex items-center px-6">
-          <Search className="w-4 h-4 text-slate-300 mr-3" />
-          <input 
-            type="text" 
-            placeholder="Buscar por nombre o depto..." 
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full py-4 text-sm font-medium outline-none bg-transparent"
-          />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Tabla tradicional */}
+        <div className="lg:col-span-8 flex flex-col">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="md:col-span-1 border border-slate-100 bg-white p-2 rounded-2xl shadow-sm flex items-center px-4">
+              <Search className="w-4 h-4 text-slate-300 mr-2 shrink-0" />
+              <input 
+                type="text" 
+                placeholder="Buscar por nombre o depto..." 
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full py-2 text-sm font-medium outline-none bg-transparent"
+              />
+            </div>
+            <div className="md:col-span-2 grid grid-cols-2 gap-2">
+              <input 
+                type="date" 
+                value={dateRange.start}
+                onChange={e => setDateRange({...dateRange, start: e.target.value})}
+                className="w-full px-4 py-2 rounded-xl bg-white border border-slate-100 font-bold text-[11px] text-slate-500 uppercase tracking-widest outline-none"
+              />
+              <input 
+                type="date" 
+                value={dateRange.end}
+                onChange={e => setDateRange({...dateRange, end: e.target.value})}
+                className="w-full px-4 py-2 rounded-xl bg-white border border-slate-100 font-bold text-[11px] text-slate-500 uppercase tracking-widest outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50/50 text-slate-400 font-bold border-b border-slate-100">
+                  <tr>
+                    <th className="px-6 py-4 uppercase tracking-widest text-[9px]">Empleado</th>
+                    <th className="px-6 py-4 uppercase tracking-widest text-[9px]">Dep.</th>
+                    <th className="px-6 py-4 uppercase tracking-widest text-[9px]">Fecha</th>
+                    <th className="px-6 py-4 uppercase tracking-widest text-[9px]">Hora</th>
+                    <th className="px-6 py-4 uppercase tracking-widest text-[9px]">Tipo</th>
+                    <th className="px-6 py-4 uppercase tracking-widest text-[9px]">Puntualidad</th>
+                    <th className="px-6 py-4 uppercase tracking-widest text-[9px] text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredRecords.length > 0 ? filteredRecords.map((record) => (
+                    <tr key={record.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs uppercase shrink-0">
+                            {record.name.charAt(0)}
+                          </div>
+                          <span className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors text-xs">{record.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-slate-400 font-bold text-[10px]">{record.department}</td>
+                      <td className="px-6 py-4 text-slate-500 font-medium text-xs">
+                        {record.date}
+                      </td>
+                      <td className="px-6 py-4 font-mono text-slate-600 font-bold text-[11px]">{record.time}</td>
+                      <td className="px-6 py-4">
+                        <span className={cn(
+                          "px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest inline-block",
+                          record.type === 'Entrada' ? "text-emerald-600 bg-emerald-50" : "text-orange-600 bg-orange-50"
+                        )}>
+                          {record.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-md",
+                            record.punctuality === 'Retraso' || record.punctuality === 'Temprano' ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                          )}>
+                            {record.punctuality || 'Normal'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => record.id && handleDelete(record.id)}
+                          className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-16 text-center">
+                        <div className="flex flex-col items-center gap-2">
+                           <Filter className="w-8 h-8 text-slate-200" />
+                           <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Sin asistencias encontradas</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <div className="md:col-span-2 grid grid-cols-2 gap-4">
-          <input 
-            type="date" 
-            value={dateRange.start}
-            onChange={e => setDateRange({...dateRange, start: e.target.value})}
-            className="w-full px-6 py-4 rounded-2xl bg-white border border-slate-100 font-bold text-xs text-slate-500 uppercase tracking-widest"
-          />
-          <input 
-            type="date" 
-            value={dateRange.end}
-            onChange={e => setDateRange({...dateRange, end: e.target.value})}
-            className="w-full px-6 py-4 rounded-2xl bg-white border border-slate-100 font-bold text-xs text-slate-500 uppercase tracking-widest"
-          />
+
+        {/* Panel AI (Análisis inteligente) */}
+        <div className="lg:col-span-4 flex flex-col">
+          <div className="bg-gradient-to-br from-indigo-950 to-slate-900 rounded-[2.5rem] p-6 text-white shadow-xl flex flex-col h-[520px] relative overflow-hidden">
+            <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-500/20 rounded-xl">
+                  <Sparkles className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight text-white">Analista de Reportes AI</h3>
+                  <p className="text-[9px] font-bold text-indigo-300 uppercase tracking-wider">Desarrollado con Gemini</p>
+                </div>
+              </div>
+              <span className={cn(
+                "px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest",
+                isPremium ? "bg-indigo-500 text-white" : "bg-amber-500 text-slate-950"
+              )}>
+                {isPremium ? 'Premium' : 'Demo'}
+              </span>
+            </div>
+
+            {/* Chat Body */}
+            <div className="flex-1 overflow-y-auto mb-4 space-y-3 pr-1 text-xs">
+              {aiMessages.map((msg, idx) => (
+                <div key={idx} className={cn(
+                  "p-3 rounded-2xl max-w-[85%] leading-relaxed",
+                  msg.role === 'user' 
+                    ? "bg-indigo-600/50 text-white ml-auto rounded-tr-none border border-indigo-500/25" 
+                    : "bg-white/5 text-slate-200 mr-auto rounded-tl-none border border-white/5 whitespace-pre-wrap font-medium"
+                )}>
+                  {msg.text}
+                </div>
+              ))}
+              {isAiLoading && (
+                <div className="flex items-center gap-2 text-indigo-300 font-semibold p-2 animate-pulse text-[10px]">
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-400 shrink-0" />
+                  <span>Gemini está analizando los registros actuales...</span>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Quick Suggestions */}
+            {aiMessages.length <= 1 && (
+              <div className="mb-4 space-y-1.5 shrink-0">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 px-1">Consultas rápidas:</p>
+                <div className="flex flex-col gap-1.5">
+                  <button 
+                    disabled={isAiLoading}
+                    onClick={() => handleAiQuestion("¿Quién ha tenido más retrasos esta semana?")}
+                    className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-bold text-slate-300 border border-white/5 transition-all text-left"
+                  >
+                    🔍 Registrar retrasos de la semana
+                  </button>
+                  <button 
+                    disabled={isAiLoading}
+                    onClick={() => handleAiQuestion("Resume las estadísticas por departamento")}
+                    className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-bold text-slate-300 border border-white/5 transition-all text-left"
+                  >
+                    📊 Reporte de puntualidad por depto.
+                  </button>
+                  <button 
+                    disabled={isAiLoading}
+                    onClick={() => handleAiQuestion("¿Cuáles son los días con mejor asistencia?")}
+                    className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-bold text-slate-300 border border-white/5 transition-all text-left"
+                  >
+                    📈 Tendencias clave de asistencia
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Input & Form */}
+            <form onSubmit={handleAiSubmit} className="flex gap-2 items-center pt-2 border-t border-white/5 shrink-0">
+              <input 
+                type="text"
+                disabled={isAiLoading}
+                placeholder={isPremium ? "Pregunta al Analista AI..." : "Disponible en Plan Completo..."}
+                value={aiInput}
+                onChange={e => setAiInput(e.target.value)}
+                className="flex-1 bg-white/5 text-xs text-white placeholder-slate-500 rounded-xl px-4 py-3 outline-none border border-white/5 focus:border-indigo-500 transition-all font-medium"
+              />
+              <button 
+                type="submit"
+                disabled={isAiLoading || !aiInput.trim()}
+                className="p-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white rounded-xl transition-all shadow-lg"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+
+            {/* Demo Non-Premium Lock overlay */}
+            {showPromoLock && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="absolute inset-0 bg-slate-950/95 backdrop-blur-sm p-6 flex flex-col justify-center items-center text-center z-10"
+              >
+                <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center mb-4 text-amber-400 animate-bounce">
+                  <ShieldCheck className="w-8 h-8" />
+                </div>
+                <h4 className="font-bold text-lg text-white mb-2">Asistente AI Premium</h4>
+                <p className="text-slate-300 text-xs px-2 mb-6 leading-relaxed">
+                  El <strong>Asistente AI</strong> con consultas personalizadas en lenguaje natural está disponible únicamente para clientes del <strong>Plan Completo (Premium)</strong>. 
+                </p>
+                <div className="flex gap-3 w-full">
+                  <button 
+                    onClick={() => setShowPromoLock(false)}
+                    className="flex-1 py-3 bg-white/10 hover:bg-white/15 rounded-xl font-bold text-[10px] uppercase tracking-widest text-slate-300 transition-all"
+                  >
+                    Volver
+                  </button>
+                  <button 
+                    onClick={() => onNavigate('pricing')}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-[10px] uppercase tracking-widest text-white transition-all shadow-lg"
+                  >
+                    Actualizar
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </div>
         </div>
       </div>
+    </motion.div>
+  );
+}
 
-      <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50/50 text-slate-400 font-bold border-b border-slate-100">
-              <tr>
-                <th className="px-8 py-6 uppercase tracking-widest text-[10px]">Empleado</th>
-                <th className="px-8 py-6 uppercase tracking-widest text-[10px]">Dep.</th>
-                <th className="px-8 py-6 uppercase tracking-widest text-[10px]">Fecha</th>
-                <th className="px-8 py-6 uppercase tracking-widest text-[10px]">Hora</th>
-                <th className="px-8 py-6 uppercase tracking-widest text-[10px]">Tipo</th>
-                <th className="px-8 py-6 uppercase tracking-widest text-[10px]">Puntualidad</th>
-                <th className="px-8 py-6 uppercase tracking-widest text-[10px] text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredRecords.length > 0 ? filteredRecords.map((record) => (
-                <tr key={record.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs uppercase">
-                        {record.name.charAt(0)}
-                      </div>
-                      <span className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{record.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-5 text-slate-400 font-bold text-xs">{record.department}</td>
-                  <td className="px-8 py-5 text-slate-500 font-medium text-xs">
-                    {record.date}
-                  </td>
-                  <td className="px-8 py-5 font-mono text-slate-600 font-bold text-xs">{record.time}</td>
-                  <td className="px-8 py-5">
-                    <span className={cn(
-                      "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest inline-block",
-                      record.type === 'Entrada' ? "text-emerald-600 bg-emerald-50" : "text-orange-600 bg-orange-50"
-                    )}>
-                      {record.type}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md",
-                        record.punctuality === 'Retraso' || record.punctuality === 'Temprano' ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
-                      )}>
-                        {record.punctuality || 'Normal'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-5 text-right">
+function ApiIntegrationView({ companyId, companyData, userId, onBack, onNavigate }: { companyId: string | null; companyData: any; userId: string; onBack: () => void; onNavigate: (v: string) => void; key?: string }) {
+  const [apiKey, setApiKey] = useState<string>(companyData?.apiKey || '');
+  const [copied, setCopied] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedTab, setSelectedTab] = useState<'curl' | 'js' | 'python'>('curl');
+
+  const isPremium = companyData?.plan === 'premium' || companyData?.plan === 'Completo';
+
+  const handleGenerateKey = async () => {
+    if (!companyId || !userId) return;
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/generate-api-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId, userId }),
+      });
+      const data = await response.json();
+      if (data.apiKey) {
+        setApiKey(data.apiKey);
+        if (companyData) companyData.apiKey = data.apiKey;
+      } else {
+        alert(data.error || "Error al generar la llave API");
+      }
+    } catch (err: any) {
+      alert("Error de conexión al generar la clave");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCopy = () => {
+    if (!apiKey) return;
+    navigator.clipboard.writeText(apiKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const codeSnippets = {
+    curl: `# 1. Obtener empleados activos en la nómina
+curl -X GET "${window.location.origin}/api/v1/employees" \\
+  -H "x-api-key: ${apiKey || 'TU_API_KEY'}"
+
+# 2. Registrar check-in / asistencia remota
+curl -X POST "${window.location.origin}/api/v1/attendance" \\
+  -H "x-api-key: ${apiKey || 'TU_API_KEY'}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Alex Gómez",
+    "department": "Producción",
+    "type": "Entrada",
+    "punctuality": "A tiempo"
+  }'`,
+
+    js: `// Un ejemplo de integración en NodeJS
+const axios = require('axios');
+
+async function registrarAsistencia() {
+  const url = '${window.location.origin}/api/v1/attendance';
+  const headers = {
+    'x-api-key': '${apiKey || 'TU_API_KEY'}',
+    'Content-Type': 'application/json'
+  };
+  const body = {
+    name: 'Alex Gómez',
+    department: 'Producción',
+    type: 'Entrada',
+    punctuality: 'A tiempo'
+  };
+
+  try {
+    const res = await axios.post(url, body, { headers });
+    console.log('Registro exitoso:', res.data);
+  } catch (err) {
+    console.error('Error:', err.response?.data || err.message);
+  }
+}
+
+registrarAsistencia();`,
+
+    python: `# Un ejemplo de integración en Python
+import requests
+
+url = "${window.location.origin}/api/v1/attendance"
+headers = {
+    "x-api-key": "${apiKey || 'TU_API_KEY'}",
+    "Content-Type": "application/json"
+}
+payload = {
+    "name": "Alex Gómez",
+    "department": "Producción",
+    "type": "Entrada",
+    "punctuality": "A tiempo"
+}
+
+try:
+    response = requests.post(url, json=payload, headers=headers)
+    print("Respuesta API:", response.json())
+except Exception as e:
+    print("Error de conexión:", e)`
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="min-h-screen bg-slate-50 p-6 md:p-10"
+    >
+      <div className="max-w-4xl mx-auto">
+        <header className="flex items-center gap-4 mb-12">
+          <button onClick={onBack} className="p-3 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all">
+            <ChevronLeft className="w-5 h-5 text-indigo-600" />
+          </button>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">Conectores de API</h1>
+            <p className="text-indigo-600 font-bold uppercase tracking-widest text-[10px] mt-1 font-sans">Herramientas para Desarrolladores & ERP</p>
+          </div>
+        </header>
+
+        {!isPremium ? (
+          <div className="bg-white rounded-[3.5rem] p-10 md:p-16 shadow-xl border border-slate-100 text-center max-w-2xl mx-auto">
+            <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 mb-6 mx-auto">
+              <ShieldCheck className="w-8 h-8 font-bold" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 mb-2">Conectividad API (Premium)</h3>
+            <p className="text-slate-500 font-semibold text-sm leading-relaxed mb-8">
+              La API REST de BioPoint te permite sincronizar y reportar entradas/salidas desde tótems de hardware externos, ERPs (SAP, Dynamics, Odoo) o sistemas de liquidación de sueldos utilizando una firma de clave única segura.
+            </p>
+
+            <div className="bg-slate-50 rounded-[2rem] p-6 text-left max-w-md mx-auto mb-10 space-y-3 border border-slate-100">
+              <div className="flex gap-3">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <span className="text-slate-600 text-xs font-bold leading-tight">Acceso programático a listados de empleados</span>
+              </div>
+              <div className="flex gap-3">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <span className="text-slate-600 text-xs font-bold leading-tight">Registro de asistencia en tiempo real desde tótems de terceros</span>
+              </div>
+              <div className="flex gap-3">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <span className="text-slate-600 text-xs font-bold leading-tight">Consulta histórica automatizada para automatización de nóminas</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => onNavigate('pricing')}
+              className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-indigo-100"
+            >
+              Adquirir el Plan Completo (Premium)
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-xl border border-slate-100">
+              <h3 className="text-2xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+                <Key className="w-6 h-6 text-indigo-600" /> Clave de Acceso API Activa
+              </h3>
+              <p className="text-slate-400 font-medium text-sm leading-relaxed mb-6">
+                Utiliza esta clave única en la cabecera HTTP **`x-api-key`** para firmar tus peticiones de integración. **Nunca compartas tu llave API en repositorios públicos**.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 items-stretch mb-6">
+                <div className="flex-grow bg-slate-50 rounded-2xl border border-slate-100 px-6 py-4 flex items-center justify-between font-mono text-[11px] select-all text-slate-700 font-bold overflow-x-auto">
+                  {apiKey ? apiKey : 'No se ha generado ninguna clave API activa.'}
+                </div>
+                <div className="flex gap-2">
+                  {apiKey && (
                     <button 
-                      onClick={() => record.id && handleDelete(record.id)}
-                      className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                      onClick={handleCopy}
+                      className="p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-all"
+                      title="Copiar llave"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {copied ? <Check className="w-5 h-5 text-emerald-600 font-bold" /> : <Copy className="w-5 h-5" />}
                     </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={6} className="px-8 py-24 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                       <Filter className="w-10 h-10 text-slate-200" />
-                       <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Sin coincidencias en la búsqueda</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  )}
+                  <button 
+                    onClick={handleGenerateKey}
+                    disabled={isGenerating}
+                    className="px-6 py-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-400 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg flex items-center gap-2"
+                  >
+                    {isGenerating ? 'Generando...' : (apiKey ? 'Rotar Clave' : 'Generar Clave')}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-xl border border-slate-100">
+              <h3 className="text-xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+                <Code className="w-5 h-5 text-indigo-600" /> Guía Rápida de Implementación
+              </h3>
+              <p className="text-slate-400 font-medium text-xs mb-6">
+                Todas las llamadas HTTP requieren la cabecera **`x-api-key`**.
+              </p>
+
+              {/* Tabs */}
+              <div className="flex border-b border-slate-100 mb-6 gap-6">
+                {(['curl', 'js', 'python'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setSelectedTab(tab)}
+                    className={cn(
+                      "pb-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-all",
+                      selectedTab === tab ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400 hover:text-slate-600"
+                    )}
+                  >
+                    {tab === 'curl' ? 'cURL' : tab === 'js' ? 'NodeJS' : 'Python'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Snippet Viewer */}
+              <div className="bg-slate-900 rounded-2xl p-6 text-white text-[11px] font-mono whitespace-pre-wrap overflow-x-auto shadow-inner leading-relaxed">
+                {codeSnippets[selectedTab]}
+              </div>
+            </div>
+
+            <div className="bg-slate-800 text-white rounded-[2.5rem] p-8 md:p-10 shadow-xl">
+              <h3 className="text-lg font-bold mb-2">
+                📚 Especificación técnica de Endpoints
+              </h3>
+              <div className="divide-y divide-white/10 mt-6 space-y-4">
+                <div className="pt-4 first:pt-0">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="px-2 py-1 rounded bg-green-500/20 text-green-400 font-bold text-[9px] uppercase tracking-wider">GET</span>
+                    <strong className="text-xs font-mono">/api/v1/employees</strong>
+                  </div>
+                  <p className="text-[11px] text-slate-300">Obtiene la nómina de empleados activos de tu empresa. Devuelve un objeto JSON con ID, Nombre, Departamento y si tiene firma facial biométrica registrada.</p>
+                </div>
+
+                <div className="pt-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="px-2 py-1 rounded bg-green-500/20 text-green-400 font-bold text-[9px] uppercase tracking-wider">GET</span>
+                    <strong className="text-xs font-mono">/api/v1/attendance</strong>
+                  </div>
+                  <p className="text-[11px] text-slate-300">Consulta todos los reportes históricos de asistencia de tu empresa, ordenados cronológicamente.</p>
+                </div>
+
+                <div className="pt-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="px-2 py-1 rounded bg-indigo-500/20 text-indigo-400 font-bold text-[9px] uppercase tracking-wider">POST</span>
+                    <strong className="text-xs font-mono">/api/v1/attendance</strong>
+                  </div>
+                  <p className="text-[11px] text-slate-300">Sincroniza un check-in o check-out desde un hardware externo o software de terceros enviando el nombre, departamento opcional, tipo ("Entrada" o "Salida") y puntualidad.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
