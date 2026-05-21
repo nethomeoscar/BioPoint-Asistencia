@@ -30,7 +30,8 @@ import {
   Send,
   Key,
   Copy,
-  Check
+  Check,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -364,7 +365,11 @@ export default function App() {
 
   const isTrialActive = companyData?.plan && companyData?.plan !== 'free'
     ? true
-    : (companyData?.trialEndsAt ? !isPast(parseISO(companyData.trialEndsAt)) : true);
+    : (companyData?.trialEndsAt 
+        ? !isPast(parseISO(companyData.trialEndsAt)) 
+        : (companyData?.createdAt 
+            ? !isPast(addDays(parseISO(companyData.createdAt), 15)) 
+            : true));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -496,6 +501,7 @@ export default function App() {
             employees={employees}
             companyId={companyId!}
             onBack={() => setView('dashboard')}
+            isModelsLoaded={isModelsLoaded}
           />
         )}
       </AnimatePresence>
@@ -571,7 +577,19 @@ function LoginView({ onLogin, isLoading, onCancel, onTutorials }: any) {
 }
 
 function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isModelsLoaded, isTrialActive, employees = [], records = [] }: any) {
-  const trialDaysLeft = companyData?.trialEndsAt ? Math.max(0, Math.ceil((parseISO(companyData.trialEndsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+  const getTrialDaysLeft = (company: any) => {
+    if (!company) return 15;
+    if (company.trialEndsAt) {
+      return Math.max(0, Math.ceil((parseISO(company.trialEndsAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
+    }
+    if (company.createdAt) {
+      const created = parseISO(company.createdAt);
+      const ends = addDays(created, 15);
+      return Math.max(0, Math.ceil((ends.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
+    }
+    return 15;
+  };
+  const trialDaysLeft = getTrialDaysLeft(companyData);
 
   return (
     <motion.div 
@@ -1322,18 +1340,173 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
               </div>
             )}
           </div>
-          </div>
+        </div>
         </div>
       )}
     </motion.div>
   );
 }
 
-function EmployeesListView({ employees, onBack, companyId }: { employees: Employee[]; onBack: () => void; companyId: string | null; key?: string }) {
+function EmployeesListView({ employees, onBack, companyId, isModelsLoaded }: { employees: Employee[]; onBack: () => void; companyId: string | null; isModelsLoaded: boolean; key?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
 
+  // Lotes / Batch Enrollment States
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchFiles, setBatchFiles] = useState<{
+    id: string;
+    file: File;
+    name: string;
+    department: string;
+    shiftStart: string;
+    shiftEnd: string;
+    descriptor: number[] | null;
+    status: 'pending' | 'processing' | 'success' | 'failed';
+    error?: string;
+    previewUrlUrl: string;
+  }[]>([]);
+  const [globalDept, setGlobalDept] = useState('Administración');
+  const [globalStart, setGlobalStart] = useState('08:00');
+  const [globalEnd, setGlobalEnd] = useState('17:00');
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const departments = ['All', ...new Set(employees.map(e => e.department))];
+
+  const cleanFilenameToName = (filename: string): string => {
+    let name = filename.substring(0, filename.lastIndexOf('.')) || filename;
+    name = name.replace(/[_-]/g, ' ');
+    return name
+      .split(' ')
+      .filter(w => w.trim() !== '')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  const extractBiometricsFromFile = (file: File): Promise<number[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        if (!e.target?.result) {
+          reject(new Error("No se pudo leer el archivo"));
+          return;
+        }
+        
+        const img = new Image();
+        img.src = e.target.result as string;
+        img.onload = async () => {
+          try {
+            if (!isModelsLoaded) {
+              reject(new Error("Modelos de IA no cargados"));
+              return;
+            }
+            
+            const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+              .withFaceLandmarks()
+              .withFaceDescriptor();
+            
+            if (detection) {
+              resolve(Array.from(detection.descriptor));
+            } else {
+              reject(new Error("Rostro no detectado"));
+            }
+          } catch (detectionErr: any) {
+            reject(detectionErr);
+          }
+        };
+        img.onerror = () => {
+          reject(new Error("Error de formato"));
+        };
+      };
+      reader.onerror = () => {
+        reject(new Error("Error de lectura"));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files) as File[];
+    await processUploadedFiles(files);
+  };
+
+  const processUploadedFiles = async (files: File[]) => {
+    const newItems = files.map(file => {
+      const name = cleanFilenameToName(file.name);
+      return {
+        id: Math.random().toString(36).substring(7),
+        file,
+        name,
+        department: globalDept,
+        shiftStart: globalStart,
+        shiftEnd: globalEnd,
+        descriptor: null,
+        status: 'pending' as const,
+        previewUrlUrl: URL.createObjectURL(file)
+      };
+    });
+
+    setBatchFiles(prev => [...prev, ...newItems]);
+
+    // Procesar consecutivamente
+    for (const item of newItems) {
+      setBatchFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'processing' } : f));
+      
+      try {
+        const descriptor = await extractBiometricsFromFile(item.file);
+        setBatchFiles(prev => prev.map(f => f.id === item.id ? { ...f, descriptor, status: 'success' } : f));
+      } catch (err: any) {
+        console.warn("Error en detección facial de", item.name, err);
+        setBatchFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'failed', error: err.message || 'Sin rostro' } : f));
+      }
+    }
+  };
+
+  const applyGlobalOverrides = () => {
+    setBatchFiles(prev => prev.map(item => ({
+      ...item,
+      department: globalDept,
+      shiftStart: globalStart,
+      shiftEnd: globalEnd
+    })));
+  };
+
+  const handleSaveBatch = async () => {
+    const validItems = batchFiles.filter(item => item.status === 'success' && item.descriptor);
+    if (validItems.length === 0) {
+      alert("No hay ningún registro válido con rostro detectado. Carga fotos nítidas con rostros de frente.");
+      return;
+    }
+
+    setIsProcessingBatch(true);
+    let successCount = 0;
+
+    try {
+      for (const item of validItems) {
+        await addDoc(collection(db, 'employees'), {
+          name: item.name.trim(),
+          department: item.department.trim(),
+          shiftStart: item.shiftStart,
+          shiftEnd: item.shiftEnd,
+          faceDescriptor: item.descriptor,
+          companyId,
+          createdAt: new Date().toISOString()
+        });
+        successCount++;
+      }
+      
+      alert(`¡Lote guardado! Se registraron ${successCount} empleados correctamente de forma biométrica.`);
+      setBatchFiles([]);
+      setShowBatchModal(false);
+    } catch (err: any) {
+      console.error("Batch Enrollment Error", err);
+      alert("Hubo un error al guardar el lote: " + err.message);
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (confirm('¿Estás seguro de eliminar a este empleado? Se perderán sus datos biométricos.')) {
@@ -1368,7 +1541,46 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
             <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Personal registrado en la base biométrica</p>
           </div>
         </div>
+        <button 
+          onClick={() => setShowBatchModal(true)}
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 shrink-0"
+        >
+          <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" /> Enrolar por Lote
+        </button>
       </header>
+
+      {/* Indicadores de Gestión de Personal */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+             <UserCircle2 className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Total de Empleados</span>
+            <h3 className="text-2xl font-black text-slate-800 mt-0.5">{employees.length}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+              <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Enrolantes Biométricos</span>
+            <h3 className="text-2xl font-black text-emerald-600 mt-0.5">{employees.filter(e => e.faceDescriptor).length}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+             <XCircle className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Pendientes de Enrolar</span>
+            <h3 className="text-2xl font-black text-rose-600 mt-0.5">{employees.filter(e => !e.faceDescriptor).length}</h3>
+          </div>
+        </div>
+      </div>
 
       <div className="bento-card overflow-hidden mb-12">
         <div className="p-8 border-b border-slate-50 flex flex-wrap gap-6 items-center bg-slate-50/30">
@@ -1450,8 +1662,8 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
                 <tr>
                   <td colSpan={5} className="px-8 py-24 text-center">
                     <div className="flex flex-col items-center gap-3">
-                       <Filter className="w-10 h-10 text-slate-200" />
-                       <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No se encontraron empleados</p>
+                        <Filter className="w-10 h-10 text-slate-200" />
+                        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No se encontraron empleados</p>
                     </div>
                   </td>
                 </tr>
@@ -1460,6 +1672,260 @@ function EmployeesListView({ employees, onBack, companyId }: { employees: Employ
           </table>
         </div>
       </div>
+
+      {/* Modal de Registro por Lotes */}
+      <AnimatePresence>
+        {showBatchModal && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-100"
+            >
+              {/* Header Modal */}
+              <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50/50">
+                <div>
+                  <h3 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-indigo-600 animate-pulse" />
+                    Enrolamiento en Lote de Fotografías
+                  </h3>
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mt-1">Carga múltiples archivos a la vez. El sistema extraerá las huellas faciales automáticamente.</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setBatchFiles([]);
+                    setShowBatchModal(false);
+                  }}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Contenido Modal */}
+              <div className="flex-1 overflow-y-auto p-8 grid grid-cols-1 md:grid-cols-12 gap-8">
+                {/* Panel de Carga / Izquierda */}
+                <div className="md:col-span-4 space-y-6">
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all h-48"
+                  >
+                    <Upload className="w-10 h-10 text-slate-300 mb-3" />
+                    <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Seleccionar Fotos</span>
+                    <span className="text-[10px] text-slate-400 font-semibold mt-1">PNG, JPG o JPEG</span>
+                  </div>
+                  <input 
+                    ref={fileInputRef} 
+                    type="file" 
+                    multiple 
+                    accept="image/*" 
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                  />
+
+                  {/* Configuración Global */}
+                  <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-widest border-b border-slate-200/60 pb-2">Preajustes Globales</h4>
+                    
+                    <div>
+                      <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Departamento</label>
+                      <input 
+                        type="text" 
+                        value={globalDept} 
+                        onChange={(e) => setGlobalDept(e.target.value)} 
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500" 
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Entrada</label>
+                        <input 
+                          type="text" 
+                          value={globalStart} 
+                          onChange={(e) => setGlobalStart(e.target.value)} 
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 text-center" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Salida</label>
+                        <input 
+                          type="text" 
+                          value={globalEnd} 
+                          onChange={(e) => setGlobalEnd(e.target.value)} 
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 text-center" 
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={applyGlobalOverrides}
+                      className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-[10px] uppercase tracking-wider transition-all"
+                    >
+                      Aplicar a Todos
+                    </button>
+                  </div>
+                </div>
+
+                {/* Listado de Archivos a Procesar / Derecha */}
+                <div className="md:col-span-8 flex flex-col border border-slate-100 rounded-2xl p-4 overflow-hidden h-[420px]">
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 border-b border-slate-100 pb-2">Archivos Cargados ({batchFiles.length})</h4>
+                  
+                  <div className="flex-1 overflow-y-auto">
+                    {batchFiles.length > 0 ? (
+                      <table className="w-full table-auto">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-slate-400 text-[9px] uppercase tracking-widest font-bold">
+                            <th className="text-left pb-2 w-16">Foto</th>
+                            <th className="text-left pb-2">Nombre</th>
+                            <th className="text-left pb-2">Depto</th>
+                            <th className="text-left pb-2 w-28">Horario</th>
+                            <th className="text-left pb-2">Estado</th>
+                            <th className="text-center pb-2 w-10">Quitar</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {batchFiles.map((item) => (
+                            <tr key={item.id} className="border-b border-slate-55 hover:bg-slate-50/50">
+                              <td className="py-2.5">
+                                <img src={item.previewUrlUrl} className="w-10 h-10 rounded-xl object-cover border border-slate-100 shadow-sm" alt="Preview" />
+                              </td>
+                              <td className="py-2.5 font-bold text-slate-800 text-xs">
+                                <input 
+                                  type="text" 
+                                  value={item.name} 
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setBatchFiles(prev => prev.map(f => f.id === item.id ? { ...f, name: value } : f));
+                                  }}
+                                  className="px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold w-full focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800"
+                                />
+                              </td>
+                              <td className="py-2.5">
+                                <input 
+                                  type="text" 
+                                  value={item.department} 
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setBatchFiles(prev => prev.map(f => f.id === item.id ? { ...f, department: value } : f));
+                                  }}
+                                  className="px-2 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-medium w-full focus:outline-none"
+                                />
+                              </td>
+                              <td className="py-2.5">
+                                <div className="flex gap-1 items-center">
+                                  <input 
+                                    type="text" 
+                                    value={item.shiftStart} 
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setBatchFiles(prev => prev.map(f => f.id === item.id ? { ...f, shiftStart: value } : f));
+                                    }}
+                                    className="w-10 px-1 py-1 bg-slate-50 border border-slate-100 rounded text-[10px] font-bold text-center text-slate-600"
+                                  />
+                                  <span className="text-slate-300">-</span>
+                                  <input 
+                                    type="text" 
+                                    value={item.shiftEnd} 
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setBatchFiles(prev => prev.map(f => f.id === item.id ? { ...f, shiftEnd: value } : f));
+                                    }}
+                                    className="w-10 px-1 py-1 bg-slate-50 border border-slate-100 rounded text-[10px] font-bold text-center text-slate-600"
+                                  />
+                                </div>
+                              </td>
+                              <td className="py-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  {item.status === 'pending' && (
+                                    <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin" /> Espera
+                                    </span>
+                                  )}
+                                  {item.status === 'processing' && (
+                                    <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                                      <Loader2 className="w-2.5 h-2.5 animate-spin" /> Escaneo
+                                    </span>
+                                  )}
+                                  {item.status === 'success' && (
+                                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-0.5">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Listo
+                                    </span>
+                                  )}
+                                  {item.status === 'failed' && (
+                                    <span 
+                                      title={item.error} 
+                                      className="text-[9px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-0.5 cursor-help"
+                                    >
+                                      <XCircle className="w-3 h-3 text-rose-500" /> Error
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2.5 text-center">
+                                <button 
+                                  onClick={() => {
+                                    URL.revokeObjectURL(item.previewUrlUrl);
+                                    setBatchFiles(prev => prev.filter(f => f.id !== item.id));
+                                  }}
+                                  className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-slate-350 py-10 space-y-2">
+                        <Upload className="w-8 h-8 opacity-40" />
+                        <p className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">No se han importado archivos</p>
+                        <p className="text-[10px] text-slate-400">Las fotos cargadas aparecerán aquí para procesamiento IA.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Modal */}
+              <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50">
+                <button 
+                  onClick={() => {
+                    setBatchFiles([]);
+                    setShowBatchModal(false);
+                  }}
+                  className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 font-bold rounded-xl text-xs uppercase tracking-widest text-slate-500 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleSaveBatch}
+                  disabled={isProcessingBatch || batchFiles.filter(item => item.status === 'success').length === 0}
+                  className={cn(
+                    "px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg text-white flex items-center gap-2 cursor-pointer",
+                    batchFiles.filter(item => item.status === 'success').length > 0 
+                      ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100" 
+                      : "bg-slate-200 cursor-not-allowed text-slate-400"
+                  )}
+                >
+                  {isProcessingBatch ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      Guardar Lote de Personal ({batchFiles.filter(item => item.status === 'success').length})
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -2233,7 +2699,21 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
   
   const isTrialActive = companyData?.plan && companyData?.plan !== 'free'
     ? true
-    : (companyData?.trialEndsAt ? !isPast(parseISO(companyData.trialEndsAt)) : true);
+    : (companyData?.trialEndsAt 
+        ? !isPast(parseISO(companyData.trialEndsAt)) 
+        : (companyData?.createdAt 
+            ? !isPast(addDays(parseISO(companyData.createdAt), 15)) 
+            : true));
+
+  const isCurrentPlan = (planId: string) => {
+    if (!companyData?.plan) return false;
+    const current = companyData.plan.toLowerCase();
+    if (current === planId) return true;
+    if (planId === 'premium' && (current === 'completo' || current === 'premium' || current === 'premium (completo)')) return true;
+    if (planId === 'basic' && (current === 'básico' || current === 'basic')) return true;
+    if (planId === 'standard' && (current === 'estándar' || current === 'standard')) return true;
+    return false;
+  };
 
   const plans = [
     {
@@ -2384,13 +2864,13 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
                 disabled={isProcessing}
                 className={cn(
                   "w-full py-4 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-xl",
-                  companyData?.plan === p.id 
+                  isCurrentPlan(p.id) 
                     ? "bg-slate-100 text-slate-400 cursor-default" 
                     : p.color + " text-white shadow-indigo-100",
                   isProcessing && "opacity-50 cursor-not-allowed"
                 )}
               >
-                {isProcessing ? 'Procesando...' : (companyData?.plan === p.id ? 'Plan Actual' : 'Suscribirse Ahora')}
+                {isProcessing ? 'Procesando...' : (isCurrentPlan(p.id) ? 'Plan Actual' : 'Suscribirse Ahora')}
               </button>
             </motion.div>
           ))}
