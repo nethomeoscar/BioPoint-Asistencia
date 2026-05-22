@@ -3054,7 +3054,7 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
                         <h4 className="font-bold text-sm text-indigo-950 mt-0.5">Plan {selectedPlanForPayment.name} mensual</h4>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-black text-indigo-950 font-mono">${selectedPlanForPayment.price} USD</span>
+                        <span className="text-xs font-black text-indigo-950 font-mono">${selectedPlanForPayment.price} MXN</span>
                         <span className="text-[9px] text-indigo-500 block uppercase font-bold">Billed Monthly</span>
                       </div>
                     </div>
