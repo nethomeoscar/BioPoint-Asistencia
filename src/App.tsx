@@ -3092,7 +3092,7 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
                       </div>
                     </div>
 
-                    {/* Llenar Demo Link */}
+                    {/* Llenar Demo Link 
                     <button
                       type="button"
                       onClick={fillMockData}
@@ -3100,6 +3100,7 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
                     >
                       💡 Llenar con Tarjeta de Pruebas (Stripe / 4242)
                     </button>
+                    */}
 
                     {paymentError && (
                       <div className="p-3 bg-rose-50 border border-rose-100 text-rose-600 text-[11px] font-bold rounded-xl text-center">
