@@ -2980,16 +2980,16 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
 
   		<div className="relative z-10">
     		<h3 className="text-white text-3xl font-bold mb-4 italic">¿Necesitas una solución personalizada?</h3>
-    		<p className="text-indigo-200 font-medium mb-8 max-w-lg mx-auto">Si tu empresa tiene necesidades específicas o más de 1000 empleados, contacta a nuestro equipo de ventas.</p>
-      		<a 
-        		href="TU_ENLACE_AQUÍ" 
-        		target="_blank" 
-        		rel="noopener noreferrer"
-        		className="inline-block" // Evita que el enlace ocupe todo el ancho de la pantalla
-      		>
-      		<button className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all">
-      		Contactar Ventas
-      		</button>
+	    		<p className="text-indigo-200 font-medium mb-8 max-w-lg mx-auto">Si tu empresa tiene necesidades específicas o más de 1000 empleados, contacta a nuestro equipo de ventas.</p>
+		      		<a 
+		        		href="https://texttoaudio-psy5.onrender.com/?lang=en" 
+		        		target="_blank" 
+		        		rel="noopener noreferrer"
+		        		className="inline-block" // Evita que el enlace ocupe todo el ancho de la pantalla
+			      	>
+	      		<button className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all">
+      			Contactar Ventas
+      			</button>
     		</a>
   		</div>
 
