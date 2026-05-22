@@ -705,7 +705,7 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
                   </div>
                   <p className="text-indigo-100/90 text-xs font-medium mb-6 leading-relaxed">
                     {isTrialActive 
-                      ? `Tu periodo de prueba de 15 días expira en ${trialDaysLeft} días, el día: ${companyData.trialEndsAt}. Asegura acceso ilimitado eligiendo un plan.`
+                      ? `Tu periodo de prueba de 15 días expira en ${trialDaysLeft} días, el día ${company.trialEndsAt}. Asegura acceso ilimitado eligiendo un plan.`
                       : 'Tu periodo de prueba de 15 días ha finalizado. Elige un plan para continuar registrando asistencias.'}
                   </p>
                 </>
