@@ -2978,7 +2978,22 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
           ))}
         </div>
 
-        <div className="mt-16 bg-slate-900 rounded-[3rem] p-12 text-center relative overflow-hidden">
+  		<div className="relative z-10">
+    		<h3 className="text-white text-3xl font-bold mb-4 italic">¿Necesitas una solución personalizada?</h3>
+    		<p className="text-indigo-200 font-medium mb-8 max-w-lg mx-auto">Si tu empresa tiene necesidades específicas o más de 1000 empleados, contacta a nuestro equipo de ventas.</p>
+      		<a 
+        		href="TU_ENLACE_AQUÍ" 
+        		target="_blank" 
+        		rel="noopener noreferrer"
+        		className="inline-block" // Evita que el enlace ocupe todo el ancho de la pantalla
+      		>
+      		<button className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all">
+      		Contactar Ventas
+      		</button>
+    		</a>
+  		</div>
+
+        {/* <div className="mt-16 bg-slate-900 rounded-[3rem] p-12 text-center relative overflow-hidden">
            <div className="relative z-10">
               <h3 className="text-white text-3xl font-bold mb-4 italic">¿Necesitas una solución personalizada?</h3>
               <p className="text-indigo-200 font-medium mb-8 max-w-lg mx-auto">Si tu empresa tiene necesidades específicas o más de 1000 empleados, contacta a nuestro equipo de ventas.</p>
@@ -2988,6 +3003,7 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
            </div>
            <Zap className="absolute -right-10 -bottom-10 w-64 h-64 text-white/5 -rotate-12" />
         </div>
+		*/}
       </div>
 
       {/* Interactive Simulated Checkout Drawer modal overlay */}
