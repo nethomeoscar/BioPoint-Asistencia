@@ -3007,7 +3007,21 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
                 ))}
               </div>
 
-              <button 
+			 <button 
+                onClick={() => handleRealPayment(p)}
+                disabled={isProcessing || isCurrentPlan(p.id)}
+                className={cn(
+                  "w-full py-4 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-xl",
+                  isCurrentPlan(p.id) 
+                    ? "bg-slate-100 text-slate-450 cursor-default" 
+                    : p.color + " text-white shadow-indigo-100",
+                  isProcessing && "opacity-50 cursor-not-allowed"
+                )}
+              >
+				{isCurrentPlan(p.id) ? 'Plan Actual' : 'Suscribirse Ahora'}
+              </button>
+				
+				 {/*<button 
                 onClick={() => handleOpenPayment(p)}
                 disabled={isProcessing || isCurrentPlan(p.id)}
                 className={cn(
@@ -3019,14 +3033,8 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
                 )}
               >
                 {isCurrentPlan(p.id) ? 'Plan Actual' : 'Suscribirse Ahora'}
-              </button>
-			  <button 
-				  onClick={() => handleRealPayment('standard')} // Pasa el string del plan
-				  disabled={isProcessing}
-				  className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl"
-			   >
-				  {isProcessing ? "Procesando..." : "Suscribirse"}
-				</button>
+              </button> */}
+				
             </motion.div>
           ))}
         </div>
