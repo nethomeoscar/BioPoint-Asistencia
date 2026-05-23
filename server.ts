@@ -499,6 +499,85 @@ Instrucciones de análisis:
     res.json({ received: true });
   });
 
+  // --- AÑADE ESTO JUNTO A TUS OTROS ENDPOINTS EN SERVER.TS ---
+  
+  // Endpoint para crear la sesión de Stripe Checkout
+  app.post("/api/stripe/create-checkout-session", async (req, res) => {
+    try {
+      const { priceId, companyId, planId } = req.body;
+  
+      if (!priceId || !companyId || !planId) {
+        return res.status(400).json({ error: "Faltan parámetros requeridos (priceId, companyId, planId)." });
+      }
+  
+      const stripe = getStripe();
+  
+      // Creamos la sesión de Checkout enviando metadatos para recuperarlos en el Webhook
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceId, // ID del precio creado en tu Dashboard de Stripe (ej: price_1Qx...)
+            quantity: 1,
+          },
+        ],
+        metadata: {
+          companyId: companyId,
+          planId: planId
+        },
+        // URLs de redirección dependiendo del resultado del pago
+        success_url: `${req.headers.origin}/?view=dashboard&payment=success`,
+        cancel_url: `${req.headers.origin}/?view=dashboard&payment=cancel`,
+      });
+  
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Error al crear sesión de Stripe Checkout:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // --- REVISA Y ASEGÚRATE QUE TU WEBHOOK SE VEA ASÍ AL FINAL DEL ARCHIVO ---
+  app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+  
+    try {
+      const stripe = getStripe();
+      // Usa tu STRIPE_WEBHOOK_SECRET en producción, o el fallback local en desarrollo
+      if (process.env.STRIPE_WEBHOOK_SECRET && sig) {
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+      } else {
+        event = JSON.parse(req.body);
+      }
+    } catch (err: any) {
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+  
+    // Cuando la suscripción se completa e impacta con éxito
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const { companyId, planId } = session.metadata || {};
+  
+      if (companyId && planId) {
+        console.log(`[Stripe Webhook] Actualizando empresa ${companyId} al plan real: ${planId}`);
+        try {
+          await db.collection('companies').doc(companyId).set({
+            plan: planId, // Guarda 'basic', 'standard' o 'complete'
+            subscriptionStatus: 'active',
+            stripeSubscriptionId: session.subscription as string,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        } catch (error) {
+          console.error("Error al actualizar Firestore desde Webhook:", error);
+        }
+      }
+    }
+  
+    res.json({ received: true });
+  });
+  
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
