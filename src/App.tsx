@@ -3020,6 +3020,13 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
               >
                 {isCurrentPlan(p.id) ? 'Plan Actual' : 'Suscribirse Ahora'}
               </button>
+			  <button 
+				  onClick={() => handleRealPayment('standard')} // Pasa el string del plan
+				  disabled={isProcessing}
+				  className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl"
+			   >
+				  {isProcessing ? "Procesando..." : "Suscribirse"}
+				</button>
             </motion.div>
           ))}
         </div>
