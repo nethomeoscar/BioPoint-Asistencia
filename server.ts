@@ -13,7 +13,7 @@ let firebaseConfig: any = null;
 try {
   const configPath = path.join(process.cwd(), "firebase-applet-config.json");
   if (fs.existsSync(configPath)) {
-    firebaseConfig = JSON.parse(fs.readFileSync(configPath, \"utf8\"));
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf8"));
   }
 } catch (err) {
   console.error("Error reading firebase-applet-config.json:", err);
