@@ -2800,7 +2800,7 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
     setPaymentError('');
   };
 
-  const handleSimulatePayment = async (e: React.FormEvent) => {
+	{/*const handleSimulatePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlanForPayment) return;
 
@@ -2879,7 +2879,53 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
       setIsProcessing(false);
       setPaymentStep('idle');
     }
-  };
+  }; */}
+
+	// Reemplaza la lógica de simulación en tu vista de suscripciones:
+	const handleRealPayment = async (planId: string) => {
+	  setIsProcessing(true); // Bloquea los botones mientras procesa
+	  
+	  try {
+	    const priceId = STRIPE_PRICES[planId];
+	    if (!priceId) {
+	      alert("ID de plan no válido.");
+	      return;
+	    }
+
+	const STRIPE_PRICES: Record<string, string> = {
+	  basic: "price_1Ta5ojK5Y42sSYZXQbMNwY7j",      // Reemplaza con tus IDs reales de Stripe
+	  standard: "price_1Ta61pK5Y42sSYZXy1yY5BF0",
+	  complete: "price_1Ta63LK5Y42sSYZXrWAEbjZo",
+	};
+	
+	    // Llamamos a nuestro backend para generar la sesión de pago
+	const response = await fetch("/api/stripe/create-checkout-session", {
+	  method: "POST",
+	  headers: {
+		"Content-Type": "application/json",
+	  },
+	  body: JSON.stringify({
+		priceId,
+		companyId: companyId, // Tu variable de estado 'companyId' de App.tsx
+		planId: planId,       // Ej: 'basic', 'standard', 'complete'
+	  }),
+	});
+
+	const data = await response.json();
+
+	if (data.url) {
+	  // Redirección inmediata y segura hacia el portal de cobro de Stripe
+	  window.location.href = data.url;
+	} else {
+	  throw new Error(data.error || "No se pudo generar la sesión de Stripe.");
+	}
+  } catch (error: any) {
+	console.error("Error al iniciar el pago:", error);
+	alert(`Error de conexión con la pasarela: ${error.message}`);
+  } finally {
+	setIsProcessing(false); //
+  }
+};
 
   return (
     <motion.div 
