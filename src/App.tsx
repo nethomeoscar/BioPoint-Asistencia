@@ -569,7 +569,7 @@ function LoginView({ onLogin, isLoading, onCancel, onTutorials }: any) {
         </button>
 
         <div className="mt-10 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-           Powered by BioPoint Technology
+           Powered by CarriotBrain Technology
         </div>
       </div>
     </motion.div>
@@ -761,7 +761,7 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
       </div>
 
       <footer className="flex justify-between items-center text-slate-400 text-[10px] font-bold uppercase tracking-widest border-t border-slate-100 pt-8">
-        <p>© 2024 BioPoint Tech - v3.0.0</p>
+        <p>© 2026 CarriotBrain Tech - v3.0.0</p>
         <div className="flex gap-6">
           <span className="flex items-center gap-1.5">MODELS: <strong className={cn(isModelsLoaded ? "text-green-500" : "text-amber-500")}>{isModelsLoaded ? 'READY' : 'LOADING'}</strong></span>
           <span className="flex items-center gap-1.5">DATABASE: <strong className="text-green-500">FIREBASE</strong></span>
