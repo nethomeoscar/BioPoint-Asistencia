@@ -140,6 +140,9 @@ interface Employee {
 }
 
 export default function App() {
+  // Estados globales para controlar la visibilidad de las nuevas ventanas
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const [view, setView] = useState<'kiosk' | 'login' | 'dashboard' | 'camera' | 'data' | 'register' | 'employees' | 'pricing' | 'tutorials'>('kiosk');
   const [user, setUser] = useState<any>(null);
   const [companyId, setCompanyId] = useState<string | null>(localStorage.getItem('biopoint_companyId'));
@@ -149,9 +152,7 @@ export default function App() {
   const [isModelsLoaded, setIsModelsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  // Estados globales para controlar la visibilidad de las nuevas ventanas
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [showSupportModal, setShowSupportModal] = useState(false);
+
 
   // Load Models
   useEffect(() => {
@@ -756,29 +757,29 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
                 : 'Cambiar de Plan'}
             </button>
 
-            {/* BOTÓN: DUDAS Y COMENTARIOS */}
-            <button 
-              type="button" // Forzar a que sea interpretado puramente como botón de acción
+            {/* NUEVO: BOTÓN DUDAS Y COMENTARIOS */}
+            <button
+              type="button"
               onClick={(e) => {
-                e.stopPropagation(); // Evita que otros componentes o menús absorban el click
+                e.stopPropagation();
                 setShowFeedbackModal(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-600 rounded-xl transition-all cursor-pointer text-sm font-medium"
             >
               <Sparkles className="w-4 h-4 text-indigo-500" />
               <span>Dudas y comentarios</span>
             </button>
-            
-            {/* BOTÓN: AYUDA Y SOPORTE */}
-            <button 
+
+            {/* NUEVO: BOTÓN AYUDA Y SOPORTE */}
+            <button
               type="button"
               onClick={(e) => {
-                e.stopPropagation(); // Evita interferencias de click en la barra lateral/menú
+                e.stopPropagation();
                 setShowSupportModal(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-600 rounded-xl transition-all cursor-pointer text-sm font-medium"
             >
-              <Clock className="w-4 h-4 text-slate-500" />
+              <Clock className="w-4 h-4 text-emerald-500" />
               <span>Ayuda y soporte</span>
             </button>
             
@@ -2727,8 +2728,6 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<any | null>(null);
   const [paymentError, setPaymentError] = useState('');
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [showSupportModal, setShowSupportModal] = useState(false);
   
   const isTrialActive = companyData?.plan && companyData?.plan !== 'free'
     ? true
