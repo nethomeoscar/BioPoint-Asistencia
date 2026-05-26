@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Solicitud Recibida! - BioPoint</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            /* Mismo fondo gris claro corporativo */
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body class="text-slate-600 font-sans antialiased min-h-screen flex flex-col justify-between">
+
+    <main class="max-w-3xl mx-auto px-4 py-16 sm:px-6 lg:px-8 flex-grow flex flex-col justify-center items-center text-center">
+        
+        <div class="mb-8 relative">
+            <div class="w-20 h-20 bg-indigo-600 border border-indigo-500 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/20 animate-pulse">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        </div>
+
+        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight sm:text-4xl mb-4">
+            ¡Tu solicitud ha sido registrada!
+        </h1>
+        <p class="text-lg text-slate-500 max-w-xl mb-8">
+            Hemos recibido tus datos correctamente. Un especialista en infraestructura de <span class="text-indigo-600 font-semibold">BioPoint</span> revisará tus requerimientos y se pondrá en contacto contigo en menos de 2 horas hábiles.
+        </p>
+
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 w-full max-w-lg mb-8 shadow-sm">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-600 mb-2">¿Tienes prisa por iniciar?</h2>
+            <p class="text-sm text-slate-400 mb-4">
+                Si deseas atención prioritaria o agendar una demostración en pantalla en este mismo momento, puedes saltar directo a nuestra línea de atención:
+            </p>
+            
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="https://wa.me/524776917979?text=Hola%20BioPoint%2C%20acabo%20de%20llenar%20el%20formulario%20Enterprise%20y%20me%20gustar%C3%ADa%20agendar%20la%20demostraci%C3%B3n%20lo%20antes%20posible." 
+                   target="_blank" 
+                   class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl transition shadow-md shadow-emerald-600/10 text-sm">
+                    Acelerar por WhatsApp
+                </a>
+                
+                <a href="index.html" 
+                   class="inline-flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-xl transition text-sm border border-slate-200">
+                    Volver a la Web
+                </a>
+            </div>
+        </div>
+
+        <p class="text-xs text-slate-400 max-w-md">
+            Tu información está protegida por políticas corporativas de confidencialidad de datos. No compartiremos tus datos con terceros ni enviaremos spam.
+        </p>
+
+    </main>
+
+    <footer class="border-t border-slate-200 py-6 text-center text-sm text-slate-400 w-full bg-white">
+        &copy; 2026 BioPoint Asistencia. Todos los derechos reservados.- CarriotBrain -.
+    </footer>
+
+</body>
+</html>
