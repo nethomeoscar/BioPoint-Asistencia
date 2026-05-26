@@ -2899,7 +2899,7 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
         			<h3 className="text-white text-3xl font-bold mb-4 italic">¿Necesitas una solución personalizada?</h3>
     	    		<p className="text-indigo-200 font-medium mb-8 max-w-lg mx-auto">Si tu empresa tiene necesidades específicas o más de 1000 empleados, contacta a nuestro equipo de ventas.</p>
     		      		<a 
-    		        		href="https://carriotbraintechnologics.onrender.com/contacto_claro.html" 
+    		        		href="https://github.com/nethomeoscar/BioPoint-Asistencia/blob/main/contacto.html" 
     		        		target="_blank" 
     		        		rel="noopener noreferrer"
     		        		className="inline-block" // Evita que el enlace ocupe todo el ancho de la pantalla
