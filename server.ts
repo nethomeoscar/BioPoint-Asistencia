@@ -403,7 +403,7 @@ Instrucciones de análisis:
     }
   });
 
-  // Stripe Checkout Endpoint
+  /* Stripe Checkout Endpoint
   app.post("/api/create-checkout-session", async (req, res) => {
     try {
       const { planId, companyId, successUrl, cancelUrl } = req.body;
@@ -443,6 +443,54 @@ Instrucciones de análisis:
           },
         ],
         mode: 'subscription',
+        success_url: successUrl || `${process.env.APP_URL}?session_id={CHECKOUT_SESSION_ID}&view=dashboard`,
+        cancel_url: cancelUrl || `${process.env.APP_URL}?view=pricing`,
+        metadata: {
+          companyId,
+          planId
+        }
+      });
+
+      res.json({ url: session.url });
+    } catch (err: any) {
+      console.error("Stripe Error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });*/
+  
+  // Stripe Checkout Endpoint
+  app.post("/api/create-checkout-session", async (req, res) => {
+    try {
+      const { planId, companyId, successUrl, cancelUrl } = req.body;
+      
+      if (!planId || !companyId) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      // Mapeo de tus planes a los PRICE_ID reales creados en tu Dashboard de Stripe
+      // REEMPLAZA estos valores ('price_...') por tus IDs reales de Stripe
+      const priceIds: Record<string, string> = {
+        'basic': 'price_1Ta5ojK5Y42sSYZXQbMNwY7j',      
+        'standard': 'price_1Ta61pK5Y42sSYZXy1yY5BF0', 
+        'premium': 'price_1Ta63LK5Y42sSYZXrWAEbjZo'   
+      };
+
+      const selectedPriceId = priceIds[planId];
+      if (!selectedPriceId) {
+        return res.status(400).json({ error: "Invalid plan ID" });
+      }
+
+      const stripe = getStripe();
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            // Pasamos directamente tu ID de precio recurrente de Stripe
+            price: selectedPriceId,
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription', // Mantiene el comportamiento de suscripción recurrente
         success_url: successUrl || `${process.env.APP_URL}?session_id={CHECKOUT_SESSION_ID}&view=dashboard`,
         cancel_url: cancelUrl || `${process.env.APP_URL}?view=pricing`,
         metadata: {
