@@ -141,6 +141,7 @@ interface Employee {
 
 export default function App() {
   const [view, setView] = useState<'kiosk' | 'login' | 'dashboard' | 'camera' | 'data' | 'register' | 'employees' | 'pricing' | 'tutorials'>('kiosk');
+  const [view, setView] = useState<'dashboard' | 'pricing' | 'contacto'>('dashboard');
   const [user, setUser] = useState<any>(null);
   const [companyId, setCompanyId] = useState<string | null>(localStorage.getItem('biopoint_companyId'));
   const [companyData, setCompanyData] = useState<any>(null);
@@ -2898,21 +2899,30 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
                	<div className="relative z-10">
         			<h3 className="text-white text-3xl font-bold mb-4 italic">¿Necesitas una solución personalizada?</h3>
     	    		<p className="text-indigo-200 font-medium mb-8 max-w-lg mx-auto">Si tu empresa tiene necesidades específicas o más de 1000 empleados, contacta a nuestro equipo de ventas.</p>
-    		      		<a 
-    		        		href="https://github.com/nethomeoscar/BioPoint-Asistencia/blob/main/contacto.html" 
-    		        		target="_blank" 
-    		        		rel="noopener noreferrer"
-    		        		className="inline-block" // Evita que el enlace ocupe todo el ancho de la pantalla
-    			      	>
-    	      		<button className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all">
-          			Contactar Ventas
-          			</button>
-        				</a>
+    		      		<button
+                    onClick={() => setView('contacto')}
+                    className="w-full py-2.5 bg-slate-800 text-white font-bold rounded-xl text-xs uppercase"
+                  >
+                    Contactar Ventas
+                  </button>
     				</div>
     			</div>
     		</div>
       </div>
 
+      {view === 'dashboard' ? (
+        <div className="max-w-6xl mx-auto space-y-6">...</div>
+      ) : view === 'pricing' ? (
+        <div className="max-w-4xl mx-auto space-y-8">...</div>
+      ) : (
+        /* VISTA DE CONTACTO */
+        <div className="max-w-xl mx-auto bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h2 className="text-xl font-bold text-slate-800">Formulario de Contacto</h2>
+          <p className="text-slate-500 text-xs">Déjanos tu mensaje y nos comunicaremos contigo.</p>
+          {/* Tu diseño aquí y un botón para volver al pricing mediante setView('pricing') */}
+        </div>
+      )}
+      
       {/* Stripe Redirect Transition / Loading / Error Overlay */}
       <AnimatePresence>
         {selectedPlanForPayment && (
