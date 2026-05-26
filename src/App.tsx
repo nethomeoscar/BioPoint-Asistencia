@@ -2910,19 +2910,6 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
     		</div>
       </div>
 
-      {view === 'dashboard' ? (
-        <div className="max-w-6xl mx-auto space-y-6">...</div>
-      ) : view === 'pricing' ? (
-        <div className="max-w-4xl mx-auto space-y-8">...</div>
-      ) : (
-        /* VISTA DE CONTACTO */
-        <div className="max-w-xl mx-auto bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-          <h2 className="text-xl font-bold text-slate-800">Formulario de Contacto</h2>
-          <p className="text-slate-500 text-xs">Déjanos tu mensaje y nos comunicaremos contigo.</p>
-          {/* Tu diseño aquí y un botón para volver al pricing mediante setView('pricing') */}
-        </div>
-      )}
-      
       {/* Stripe Redirect Transition / Loading / Error Overlay */}
       <AnimatePresence>
         {selectedPlanForPayment && (
@@ -3002,6 +2989,22 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
           </div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {view === 'dashboard' ? (
+          <div className="max-w-6xl mx-auto space-y-6">...</div>
+        ) : view === 'pricing' ? (
+          <div className="max-w-4xl mx-auto space-y-8">...</div>
+        ) : (
+          /* VISTA DE CONTACTO */
+          <div className="max-w-xl mx-auto bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <h2 className="text-xl font-bold text-slate-800">Formulario de Contacto</h2>
+            <p className="text-slate-500 text-xs">Déjanos tu mensaje y nos comunicaremos contigo.</p>
+            {/* Tu diseño aquí y un botón para volver al pricing mediante setView('pricing') */}
+          </div>
+        )}
+      </AnimatePresence>
+      
     </motion.div>
   );
 }
