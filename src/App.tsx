@@ -140,7 +140,7 @@ interface Employee {
 }
 
 export default function App() {
-  const [view, setView] = useState<'kiosk' | 'login' | 'dashboard' | 'camera' | 'data' | 'register' | 'employees' | 'pricing' | 'contacto' |'tutorials'>('kiosk');
+  const [view, setView] = useState<'kiosk' | 'login' | 'dashboard' | 'camera' | 'data' | 'register' | 'employees' | 'pricing' | 'tutorials'>('kiosk');
   const [user, setUser] = useState<any>(null);
   const [companyId, setCompanyId] = useState<string | null>(localStorage.getItem('biopoint_companyId'));
   const [companyData, setCompanyData] = useState<any>(null);
@@ -2893,20 +2893,16 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
           ))}
         </div>
 
-    		<div className="relative z-10">
-    			<div className="mt-16 bg-slate-900 rounded-[3rem] p-12 text-center relative overflow-hidden">
-               	<div className="relative z-10">
-        			<h3 className="text-white text-3xl font-bold mb-4 italic">¿Necesitas una solución personalizada?</h3>
-    	    		<p className="text-indigo-200 font-medium mb-8 max-w-lg mx-auto">Si tu empresa tiene necesidades específicas o más de 1000 empleados, contacta a nuestro equipo de ventas.</p>
-    		      		<button
-                    onClick={() => setView('contacto')}
-                    className="w-full py-2.5 bg-slate-800 text-white font-bold rounded-xl text-xs uppercase"
-                  >
-                    Contactar Ventas
-                  </button>
-    				</div>
-    			</div>
-    		</div>
+        <div className="mt-16 bg-slate-900 rounded-[3rem] p-12 text-center relative overflow-hidden">
+           <div className="relative z-10">
+              <h3 className="text-white text-3xl font-bold mb-4 italic">¿Necesitas una solución personalizada?</h3>
+              <p className="text-indigo-200 font-medium mb-8 max-w-lg mx-auto">Si tu empresa tiene necesidades específicas o más de 1000 empleados, contacta a nuestro equipo de ventas.</p>
+              <button className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all">
+                Contactar Ventas
+              </button>
+           </div>
+           <Zap className="absolute -right-10 -bottom-10 w-64 h-64 text-white/5 -rotate-12" />
+        </div>
       </div>
 
       {/* Stripe Redirect Transition / Loading / Error Overlay */}
@@ -2988,22 +2984,6 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
           </div>
         )}
       </AnimatePresence>
-
-      <AnimatePresence>
-        {view === 'dashboard' ? (
-          <div className="max-w-6xl mx-auto space-y-6">...</div>
-        ) : view === 'pricing' ? (
-          <div className="max-w-4xl mx-auto space-y-8">...</div>
-        ) : (
-          /* VISTA DE CONTACTO */
-          <div className="max-w-xl mx-auto bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <h2 className="text-xl font-bold text-slate-800">Formulario de Contacto</h2>
-            <p className="text-slate-500 text-xs">Déjanos tu mensaje y nos comunicaremos contigo.</p>
-            {/* Tu diseño aquí y un botón para volver al pricing mediante setView('pricing') */}
-          </div>
-        )}
-      </AnimatePresence>
-      
     </motion.div>
   );
 }
