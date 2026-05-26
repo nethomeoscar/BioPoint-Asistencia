@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contacto Ventas Corporativas - BioPoint</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            /* Fondo gris claro idéntico al de tu panel de administración */
+            background-color: #f8fafc;
+        }
+        /* Ocultar barra de scroll del chat */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-slate-600 font-sans antialiased min-h-screen flex flex-col justify-between">
+
+    <main class="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8 flex-grow w-full">
+        
+        <div class="mb-8">
+            <a href="/" class="inline-flex items-center text-sm text-slate-500 hover:text-indigo-600 transition font-medium">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Volver a ver los planes
+            </a>
+        </div>
+
+        <div class="mb-12">
+            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight sm:text-4xl">
+                Soluciones Enterprise <span class="text-indigo-600">BioPoint</span>
+            </h1>
+            <p class="text-slate-500 mt-2">Diseñemos un ecosistema de asistencia facial adaptado a la escala de tu organización.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <div class="lg:col-span-5 space-y-6">
+                
+                <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+					<h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+						<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+						Registro de Solicitud
+					</h2>
+					
+					<form action="https://api.web3forms.com/submit" method="POST" id="leadForm" class="space-y-4">
+						
+						<input type="hidden" name="access_key" value="e3d140d0-71af-483c-a265-afb309686997">
+						
+						<input type="hidden" name="subject" value="Nuevo Lead Enterprise - BioPoint Asistencia">
+						<input type="hidden" name="redirect" id="redirectUrl" value="">
+
+						<div>
+							<label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Nombre Completo</label>
+							<input type="text" name="Nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white transition" placeholder="Ej. Carlos Mendoza">
+						</div>
+						
+						<div>
+							<label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Correo Corporativo</label>
+							<input type="email" name="Email" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white transition" placeholder="carlos@empresa.com">
+						</div>
+
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+							<div>
+								<label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Teléfono móvil</label>
+								<input type="tel" name="Telefono" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white transition" placeholder="+52 55...">
+							</div>
+							<div>
+								<label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">País</label>
+								<input type="text" name="Pais" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white transition" placeholder="México, Colombia...">
+							</div>
+						</div>
+
+						<button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition shadow-md shadow-indigo-600/10 mt-2">
+							Enviar y agendar llamada
+						</button>
+					</form>
+				</div>
+
+                <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                    <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3">¿Prefieres atención humana inmediata?</h3>
+                    <p class="text-xs text-slate-400 mb-4">Chatea directamente con nuestro equipo de ingenieros comerciales en tu app favorita.</p>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <a href="https://wa.me/524776917979?text=Hola%20BioPoint%2C%20me%20interesa%20solicitar%20una%20demostraci%C3%B3n%20personalizada%20del%20sistema%20de%20asistencia%20para%20m%C3%A1s%20de%201000%20empleados." 
+						   target="_blank" 
+						   class="flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-600 border border-emerald-200 text-emerald-600 hover:text-white font-medium py-3 px-4 rounded-xl transition text-sm">
+							<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.4.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.713-1.455L0 24zm6.59-4.846c1.66.986 3.296 1.489 4.973 1.493 5.42-.003 9.834-4.394 9.836-9.799.001-2.618-1.017-5.08-2.862-6.928C16.69 2.072 14.233.99 11.634.99 6.214.99 1.8 5.38 1.799 10.787c-.001 1.761.47 3.447 1.365 4.965l-1.011 3.693 3.792-.99c1.551.848 3.093 1.299 4.102 1.3z"/></svg>
+							WhatsApp Ventas
+						</a>
+
+                        <a href="https://t.me/oquirozs" 
+						   target="_blank" 
+						   class="flex items-center justify-center gap-2 bg-sky-50 hover:bg-sky-500 border border-sky-200 text-sky-600 hover:text-white font-medium py-3 px-4 rounded-xl transition text-sm">
+							<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.56 8.16l-1.92 9.04c-.14.65-.53.81-1.08.5l-2.93-2.16-1.41 1.36c-.16.16-.29.29-.6.29l.21-2.99 5.44-4.92c.24-.21-.05-.33-.37-.11L8.2 13.06l-2.90 1.02c-.63-.2-1.04-.63-.03-.86l11.32-4.37c.52-.2 1 .12.82.91z"/></svg>
+							Telegram Canal
+						</a>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="lg:col-span-7">
+                <div class="bg-white border border-slate-200 rounded-3xl flex flex-col h-[580px] shadow-sm overflow-hidden">
+                    
+                    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="relative">
+                                <div class="w-10 h-10 bg-indigo-600 border border-indigo-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-indigo-600/20">
+                                    BP
+                                </div>
+                                <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-800">Asistente Virtual BioPoint</h3>
+                                <p class="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                                    En línea • Respuestas al instante
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="chatBox" class="flex-grow p-6 overflow-y-auto space-y-4 no-scrollbar bg-slate-50/50">
+                        
+                        <div class="flex items-start gap-3 max-w-[85%]">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0 text-xs font-bold text-white shadow-sm">AI</div>
+                            <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-4 text-sm text-slate-700 shadow-sm">
+                                ¡Hola! 👋 Bienvenido al canal corporativo de BioPoint. Estoy programado para resolver tus dudas técnicas y comerciales sobre despliegues masivos de reconocimiento facial de forma inmediata.
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2 pt-2 pl-11">
+                            <button onclick="triggerFaq('integraciones')" class="text-xs bg-white hover:bg-indigo-600 border border-slate-200 hover:border-indigo-600 text-slate-600 hover:text-white px-3 py-2 rounded-xl transition font-medium shadow-sm">
+                                ¿Se integra con sistemas de Nómina/ERP?
+                            </button>
+                            <button onclick="triggerFaq('offline')" class="text-xs bg-white hover:bg-indigo-600 border border-slate-200 hover:border-indigo-600 text-slate-600 hover:text-white px-3 py-2 rounded-xl transition font-medium shadow-sm">
+                                ¿Funciona sin conexión a Internet?
+                            </button>
+                            <button onclick="triggerFaq('enterprise')" class="text-xs bg-white hover:bg-indigo-600 border border-slate-200 hover:border-indigo-600 text-slate-600 hover:text-white px-3 py-2 rounded-xl transition font-medium shadow-sm">
+                                ¿Qué incluye el plan de más de 1000 empleados?
+                            </button>
+                        </div>
+
+                    </div>
+
+                    <form id="chatForm" onsubmit="handleChatSubmit(event)" class="p-4 bg-white border-t border-slate-200 flex gap-2 items-center">
+                        <input id="chatInput" type="text" autocomplete="off" placeholder="Escribe tu duda o selecciona un tema de arriba..." class="flex-grow bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-600 focus:bg-white transition">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl transition shadow-md shadow-indigo-600/20 shrink-0">
+                            <svg class="w-5 h-5 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <footer class="border-t border-slate-200 py-6 text-center text-sm text-slate-400 w-full mt-12 bg-white">
+        &copy; 2026 BioPoint Asistencia. Todos los derechos reservados.- CarriotBrain -.
+    </footer>
+
+    <script>
+        // Set dynamic redirect URL
+        document.getElementById('redirectUrl').value = window.location.origin + '/gracias.html';
+        
+        // Base de conocimiento del Chatbot Corporativo
+		const faqAnswers = {
+			'integraciones': "BioPoint Enterprise cuenta con una **API REST robusta y webhooks**...",
+			'offline': "¡Sí! El hardware y los quioscos de BioPoint...",
+			'enterprise': "Para empresas de más de 1,000 empleados incluimos...",
+			'humano': "Claro que sí. Puedes hablar directamente con un ingeniero comercial haciendo clic en el botón **WhatsApp Ventas** de la izquierda, o bien, usando este enlace directo: <a href='https://wa.me/524776917979' target='_blank' class='text-indigo-600 underline font-bold'>Iniciar Chat Humano</a>. ¡Te atenderemos de inmediato!",
+			'default': "Gracias por tu consulta. Para ofrecerte una cotización exacta de hardware o servidores dedicados para BioPoint, te sugiero hablar con nuestro equipo en vivo mediante <a href='https://wa.me/524776917979' target='_blank' class='text-indigo-600 underline font-bold'>WhatsApp Ventas</a> o rellenar el formulario de registro."
+		};
+
+        // Enviar un mensaje de usuario a la pantalla
+        function appendMessage(text, sender) {
+            const chatBox = document.getElementById('chatBox');
+            const messageDiv = document.createElement('div');
+            
+            if (sender === 'user') {
+                messageDiv.className = "flex items-start gap-3 max-w-[85%] ml-auto justify-end";
+                messageDiv.innerHTML = `
+                    <div class="bg-indigo-600 rounded-2xl rounded-tr-none p-4 text-sm text-white shadow-md">
+                        ${text}
+                    </div>
+                `;
+            } else {
+                messageDiv.className = "flex items-start gap-3 max-w-[85%]";
+                messageDiv.innerHTML = `
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0 text-xs font-bold text-white shadow-sm">AI</div>
+                    <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-4 text-sm text-slate-700 shadow-sm">
+                        ${text}
+                    </div>
+                `;
+            }
+            
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Manejar envío de texto manual
+        function handleChatSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if(!text) return;
+
+            appendMessage(text, 'user');
+            input.value = '';
+
+            // Respuesta automática simulando procesamiento de lenguaje natural
+            setTimeout(() => {
+                const lowerText = text.toLowerCase();
+                let answer = faqAnswers['default'];
+
+                if(lowerText.includes('integra') || lowerText.includes('api') || lowerText.includes('erp')) {
+                    answer = faqAnswers['integraciones'];
+                } else if (lowerText.includes('internet') || lowerText.includes('offline') || lowerText.includes('conexion')) {
+                    answer = faqAnswers['offline'];
+                } else if (lowerText.includes('empleado') || lowerText.includes('1000') || lowerText.includes('enterprise')) {
+                    answer = faqAnswers['enterprise'];
+                }
+
+                appendMessage(answer, 'bot');
+            }, 700);
+        }
+
+        // Disparador de los botones de preguntas frecuentes
+        function triggerFaq(key) {
+            const questions = {
+                'integraciones': '¿Se integra con sistemas de Nómina/ERP?',
+                'offline': '¿Funciona sin conexión a Internet?',
+                'enterprise': '¿Qué incluye el plan de más de 1000 empleados?'
+            };
+            
+            appendMessage(questions[key], 'user');
+            setTimeout(() => {
+                appendMessage(faqAnswers[key], 'bot');
+            }, 600);
+        }
+    </script>
+</body>
+</html>

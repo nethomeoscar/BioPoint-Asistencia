@@ -430,7 +430,7 @@ Instrucciones de análisis:
         line_items: [
           {
             price_data: {
-              currency: 'mxn',
+              currency: 'MXN',
               product_data: {
                 name: `BioPoint ${planId.charAt(0).toUpperCase() + planId.slice(1)} Plan`,
               },
@@ -457,7 +457,7 @@ Instrucciones de análisis:
       res.status(500).json({ error: err.message });
     }
   });*/
-  
+
   // Stripe Checkout Endpoint
   app.post("/api/create-checkout-session", async (req, res) => {
     try {
@@ -505,6 +505,7 @@ Instrucciones de análisis:
       res.status(500).json({ error: err.message });
     }
   });
+
 
   // Stripe Webhook Endpoint
   app.post("/api/webhook", express.raw({type: 'application/json'}), async (req, res) => {

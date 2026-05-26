@@ -150,13 +150,12 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-
   // Load Models
   useEffect(() => {
     const loadModels = async () => {
       try {
         // Use official weights from the author
-        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        const MODEL_URL = '/models';
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -501,6 +500,8 @@ export default function App() {
             key="employees"
             employees={employees}
             companyId={companyId!}
+            companyData={companyData}
+            setCompanyData={setCompanyData}
             onBack={() => setView('dashboard')}
             isModelsLoaded={isModelsLoaded}
           />
@@ -731,6 +732,10 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
                 <span className="text-white font-bold">{employees.length}</span>
               </div>
               <div className="flex justify-between">
+                <span>Faltan de Enrolar:</span>
+                <span className="text-rose-400 font-bold">{Math.max(0, (companyData?.expectedEmployeesCount || employees.length) - employees.filter(e => e.faceDescriptor).length)}</span>
+              </div>
+              <div className="flex justify-between">
                 <span>Asistencias Hoy:</span>
                 <span className="text-white font-bold">
                   {records.filter(r => r.date === new Date().toISOString().split('T')[0]).length}
@@ -753,7 +758,7 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
                 ? (isTrialActive ? 'Ver Planes de Pago' : 'Suscribirse Ahora') 
                 : 'Cambiar de Plan'}
             </button>
-          
+
             <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
               <UserCircle2 className="w-40 h-40" />
             </div>
@@ -1348,9 +1353,33 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
   );
 }
 
-function EmployeesListView({ employees, onBack, companyId, isModelsLoaded }: { employees: Employee[]; onBack: () => void; companyId: string | null; isModelsLoaded: boolean; key?: string }) {
+function EmployeesListView({ employees, onBack, companyId, isModelsLoaded, companyData, setCompanyData }: { employees: Employee[]; onBack: () => void; companyId: string | null; isModelsLoaded: boolean; companyData?: any; setCompanyData?: any; key?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
+
+  const [isEditingTotal, setIsEditingTotal] = useState(false);
+  const [tempTotal, setTempTotal] = useState(companyData?.expectedEmployeesCount?.toString() || employees.length.toString());
+
+  const handleUpdateTotal = async () => {
+    if (!companyId || !companyData) return;
+    const num = parseInt(tempTotal, 10);
+    if (isNaN(num) || num < 0) return;
+    try {
+      await updateDoc(doc(db, 'companies', companyId), {
+        expectedEmployeesCount: num
+      });
+      if (setCompanyData) {
+        setCompanyData({ ...companyData, expectedEmployeesCount: num });
+      }
+      setIsEditingTotal(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const expectedTotal = companyData?.expectedEmployeesCount || employees.length;
+  const enrolledCount = employees.filter(e => e.faceDescriptor).length;
+  const realPendingCount = Math.max(0, expectedTotal - enrolledCount);
 
   // Lotes / Batch Enrollment States
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -1551,34 +1580,65 @@ function EmployeesListView({ employees, onBack, companyId, isModelsLoaded }: { e
       </header>
 
       {/* Indicadores de Gestión de Personal */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-10">
+        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4 relative group">
+          <div className="p-3 bg-slate-50 text-slate-600 rounded-2xl shrink-0">
              <UserCircle2 className="w-6 h-6" />
           </div>
-          <div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Total de Empleados</span>
-            <h3 className="text-2xl font-black text-slate-800 mt-0.5">{employees.length}</h3>
+          <div className="flex-1">
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px] flex items-center gap-1">
+              Plantilla Laboral (Meta)
+            </span>
+            {isEditingTotal ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input 
+                  type="number"
+                  min="0"
+                  value={tempTotal}
+                  onChange={(e) => setTempTotal(e.target.value)}
+                  className="w-full px-2 py-1 text-sm font-bold border border-slate-200 rounded outline-none"
+                  autoFocus
+                />
+                <button onClick={handleUpdateTotal} className="text-indigo-600 bg-indigo-50 p-1.5 rounded hover:bg-indigo-100">
+                  <CheckCircle2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingTotal(true)}>
+                <h3 className="text-2xl font-black text-slate-800 mt-0.5">{expectedTotal}</h3>
+                <span className="opacity-0 group-hover:opacity-100 text-slate-300 transition-opacity"><Sparkles className="w-4 h-4" /></span>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl shrink-0">
+             <UserPlus className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Registrados en Sistema</span>
+            <h3 className="text-2xl font-black text-indigo-600 mt-0.5">{employees.length}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl shrink-0">
               <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Enrolantes Biométricos</span>
-            <h3 className="text-2xl font-black text-emerald-600 mt-0.5">{employees.filter(e => e.faceDescriptor).length}</h3>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Enrolados Biométricamente</span>
+            <h3 className="text-2xl font-black text-emerald-600 mt-0.5">{enrolledCount}</h3>
           </div>
         </div>
 
         <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+          <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl shrink-0">
              <XCircle className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Pendientes de Enrolar</span>
-            <h3 className="text-2xl font-black text-rose-600 mt-0.5">{employees.filter(e => !e.faceDescriptor).length}</h3>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Faltan por registrar</span>
+            <h3 className="text-2xl font-black text-rose-600 mt-0.5">{realPendingCount}</h3>
           </div>
         </div>
       </div>
@@ -2897,7 +2957,7 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
            <div className="relative z-10">
               <h3 className="text-white text-3xl font-bold mb-4 italic">¿Necesitas una solución personalizada?</h3>
               <p className="text-indigo-200 font-medium mb-8 max-w-lg mx-auto">Si tu empresa tiene necesidades específicas o más de 1000 empleados, contacta a nuestro equipo de ventas.</p>
-              <button className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all">
+              <button onClick={() => window.location.href = '/contacto.html'} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all">
                 Contactar Ventas
               </button>
            </div>
