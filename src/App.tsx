@@ -140,8 +140,7 @@ interface Employee {
 }
 
 export default function App() {
-  const [view, setView] = useState<'kiosk' | 'login' | 'dashboard' | 'camera' | 'data' | 'register' | 'employees' | 'pricing' | 'tutorials'>('kiosk');
-  const [view, setView] = useState<'dashboard' | 'pricing' | 'contacto'>('dashboard');
+  const [view, setView] = useState<'kiosk' | 'login' | 'dashboard' | 'camera' | 'data' | 'register' | 'employees' | 'pricing' | 'contacto' |'tutorials'>('kiosk');
   const [user, setUser] = useState<any>(null);
   const [companyId, setCompanyId] = useState<string | null>(localStorage.getItem('biopoint_companyId'));
   const [companyData, setCompanyData] = useState<any>(null);
