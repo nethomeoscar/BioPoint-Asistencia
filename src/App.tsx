@@ -753,6 +753,26 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
                 : 'Cambiar de Plan'}
             </button>
 
+            <button 
+              onClick={() => onNavigate('pricing')}
+              className="w-full bg-white text-indigo-600 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-indigo-900/20 hover:scale-[1.02] active:scale-95 transition-all text-center relative z-10 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <CreditCard className="w-4 h-4" />
+              {companyData?.plan === 'free' || !companyData?.plan 
+                ? (isTrialActive ? 'Dudas y comentarios' : 'Suscribirse Ahora') 
+                : 'Cambiar de Plan'}
+            </button>
+
+            <button 
+              onClick={() => onNavigate('pricing')}
+              className="w-full bg-white text-indigo-600 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-indigo-900/20 hover:scale-[1.02] active:scale-95 transition-all text-center relative z-10 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <CreditCard className="w-4 h-4" />
+              {companyData?.plan === 'free' || !companyData?.plan 
+                ? (isTrialActive ? 'Ayuda y Soporte' : 'Suscribirse Ahora') 
+                : 'Cambiar de Plan'}
+            </button>
+            
             <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
               <UserCircle2 className="w-40 h-40" />
             </div>
