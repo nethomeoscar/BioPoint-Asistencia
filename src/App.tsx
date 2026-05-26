@@ -149,6 +149,9 @@ export default function App() {
   const [isModelsLoaded, setIsModelsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // Estados globales para controlar la visibilidad de las nuevas ventanas
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
 
   // Load Models
   useEffect(() => {
@@ -753,17 +756,27 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
                 : 'Cambiar de Plan'}
             </button>
 
+            {/* BOTÓN: DUDAS Y COMENTARIOS */}
             <button 
-              onClick={() => setShowFeedbackModal(true)}
-              className="flex items-center gap-2 px-4 py-2 hover:bg-slate-150 rounded-xl transition-all"
+              type="button" // Forzar a que sea interpretado puramente como botón de acción
+              onClick={(e) => {
+                e.stopPropagation(); // Evita que otros componentes o menús absorban el click
+                setShowFeedbackModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
             >
               <Sparkles className="w-4 h-4 text-indigo-500" />
               <span>Dudas y comentarios</span>
             </button>
             
+            {/* BOTÓN: AYUDA Y SOPORTE */}
             <button 
-              onClick={() => setShowSupportModal(true)}
-              className="flex items-center gap-2 px-4 py-2 hover:bg-slate-150 rounded-xl transition-all"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation(); // Evita interferencias de click en la barra lateral/menú
+                setShowSupportModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
             >
               <Clock className="w-4 h-4 text-slate-500" />
               <span>Ayuda y soporte</span>
