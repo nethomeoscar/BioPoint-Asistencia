@@ -1532,7 +1532,7 @@ function EmployeesListView({ employees, onBack, companyId, isModelsLoaded }: { e
       exit={{ opacity: 0, x: -20 }}
       className="p-6 md:p-10 flex flex-col min-h-screen max-w-6xl mx-auto w-full"
     >
-      {/*<header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="p-3 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all active:scale-95">
             <ChevronLeft className="w-5 h-5 text-indigo-600" />
@@ -1550,7 +1550,7 @@ function EmployeesListView({ employees, onBack, companyId, isModelsLoaded }: { e
         </button>
       </header>
 
-      {/* Indicadores de Gestión de Personal *
+      {/* Indicadores de Gestión de Personal */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
         <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
@@ -1579,89 +1579,6 @@ function EmployeesListView({ employees, onBack, companyId, isModelsLoaded }: { e
           <div>
             <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Pendientes de Enrolar</span>
             <h3 className="text-2xl font-black text-rose-600 mt-0.5">{employees.filter(e => !e.faceDescriptor).length}</h3>
-          </div>
-        </div>
-      </div>*/}
-
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-3 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 transition-all active:scale-95">
-            <ChevronLeft className="w-5 h-5 text-indigo-600" />
-          </button>
-          <div className="flex flex-col">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-800">Gestión de Empleados</h1>
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Personal registrado en la base biométrica</p>
-          </div>
-        </div>
-        <button 
-          onClick={() => setShowBatchModal(true)}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 shrink-0"
-        >
-          <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" /> Enrolar por Lote
-        </button>
-      </header>
-
-      {/* Indicadores de Gestión de Personal */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-10">
-        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4 relative group">
-          <div className="p-3 bg-slate-50 text-slate-600 rounded-2xl shrink-0">
-             <UserCircle2 className="w-6 h-6" />
-          </div>
-          <div className="flex-1">
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px] flex items-center gap-1">
-              Plantilla Laboral (Meta)
-            </span>
-            {isEditingTotal ? (
-              <div className="flex items-center gap-2 mt-1">
-                <input 
-                  type="number"
-                  min="0"
-                  value={tempTotal}
-                  onChange={(e) => setTempTotal(e.target.value)}
-                  className="w-full px-2 py-1 text-sm font-bold border border-slate-200 rounded outline-none"
-                  autoFocus
-                />
-                <button onClick={handleUpdateTotal} className="text-indigo-600 bg-indigo-50 p-1.5 rounded hover:bg-indigo-100">
-                  <CheckCircle2 className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingTotal(true)}>
-                <h3 className="text-2xl font-black text-slate-800 mt-0.5">{expectedTotal}</h3>
-                <span className="opacity-0 group-hover:opacity-100 text-slate-300 transition-opacity"><Sparkles className="w-4 h-4" /></span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl shrink-0">
-             <UserPlus className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Registrados en Sistema</span>
-            <h3 className="text-2xl font-black text-indigo-600 mt-0.5">{employees.length}</h3>
-          </div>
-        </div>
-
-        
-        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl shrink-0">
-              <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Enrolados Biométricamente</span>
-            <h3 className="text-2xl font-black text-emerald-600 mt-0.5">{enrolledCount}</h3>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl shrink-0">
-             <XCircle className="w-6 h-6" />
-          </div>
-          <div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Faltan por registrar</span>
-            <h3 className="text-2xl font-black text-rose-600 mt-0.5">{realPendingCount}</h3>
           </div>
         </div>
       </div>
