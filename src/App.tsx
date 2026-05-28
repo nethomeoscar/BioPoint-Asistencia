@@ -2796,6 +2796,43 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
     }
   };
 
+const handleCancelSubscription = async () => {
+    const confirmCancel = window.confirm("¿Estás seguro de que deseas cancelar tu suscripción? Podrás seguir usando las funciones premium hasta el final de tu ciclo de facturación actual.");
+    if (!confirmCancel) return;
+
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/cancel-subscription", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          companyId,
+          userId: auth.currentUser?.uid // Asegúrate de tener importado 'auth' si no lo está a nivel global
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Ocurrió un error al cancelar.");
+      }
+
+      alert("Suscripción cancelada exitosamente.");
+      
+      // Actualizar el estado local para reflejar el cambio inmediatamente
+      if (setCompanyData) {
+        setCompanyData((prev: any) => ({ ...prev, subscriptionStatus: 'canceled_at_period_end' }));
+      }
+
+    } catch (err: any) {
+      alert("Error al cancelar: " + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -2836,6 +2873,36 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
               </p>
             </div>
           </div>
+		  
+		  //Botón cancelar Suscripción
+		  ) : (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 mb-10 flex gap-4 items-start shadow-sm">
+            <div className="p-3 bg-indigo-100 text-indigo-750 rounded-xl mt-1">
+              <Crown className="w-4 h-4 shrink-0 text-indigo-600" />
+            </div>
+            <div className="text-left flex-1">
+              <h3 className="font-extrabold text-xs text-indigo-950">Suscripción Activa</h3>
+              <p className="text-[11px] text-indigo-800 font-medium leading-relaxed mt-0.5 mb-3">
+                Actualmente tienes contratado el plan <strong className="capitalize">{companyData?.plan === 'basic' ? 'Básico' : companyData?.plan === 'standard' ? 'Estándar' : 'Completo'}</strong>. Puedes cambiar de plan o gestionar tu facturación en esta sección.
+              </p>
+              
+              {companyData?.subscriptionStatus === 'canceled_at_period_end' ? (
+                <span className="inline-block px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                  Se cancelará al terminar el periodo
+                </span>
+              ) : (
+                <button 
+                  onClick={handleCancelSubscription}
+                  disabled={isProcessing}
+                  className="px-4 py-2 bg-white text-rose-600 border border-rose-100 hover:bg-rose-50 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm disabled:opacity-50"
+                >
+                  {isProcessing ? 'Procesando...' : 'Cancelar Suscripción'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+		  
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
