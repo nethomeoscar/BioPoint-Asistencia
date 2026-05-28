@@ -2873,7 +2873,7 @@ const handleCancelSubscription = async () => {
               </p>
             </div>
           </div>
-		  
+		  )}
 		  //Botón cancelar Suscripción
 		  ) : (
           <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 mb-10 flex gap-4 items-start shadow-sm">
