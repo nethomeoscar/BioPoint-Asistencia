@@ -154,18 +154,8 @@ export default function App() {
   useEffect(() => {
     const loadModels = async () => {
       try {
-        // Set CPU backend to avoid sandboxed iframe WebGL context/readPixels coordinate bugs (returns null/NaN coordinates)
-        try {
-          if (faceapi && faceapi.tf && typeof faceapi.tf.setBackend === 'function') {
-            await faceapi.tf.setBackend('cpu');
-            console.log("Successfully set face-api tfjs backend to CPU");
-          }
-        } catch (tfErr) {
-          console.warn("Failed to force CPU backend, falling back:", tfErr);
-        }
-
         // Use official weights from the author
-        const MODEL_URL = '/models';
+        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
