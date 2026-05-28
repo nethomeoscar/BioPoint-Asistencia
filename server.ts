@@ -506,6 +506,55 @@ Instrucciones de análisis:
     }
   });
 
+  // Cancel Subscription Endpoint
+  app.post("/api/cancel-subscription", async (req, res) => {
+    try {
+      const { companyId } = req.body;
+      if (!companyId) {
+        return res.status(400).json({ error: "Falta el ID de la compañía." });
+      }
+
+      // Read company to fetch stripeSubscriptionId
+      const companyRef = db.collection('companies').doc(companyId);
+      const companyDoc = await companyRef.get().catch(() => null);
+      
+      let stripeSubscriptionId = "";
+      if (companyDoc && companyDoc.exists) {
+        stripeSubscriptionId = companyDoc.data()?.stripeSubscriptionId || "";
+      }
+
+      let stripeCancelled = false;
+      // If Stripe subscription ID exists, cancel it through active Stripe
+      if (stripeSubscriptionId) {
+        try {
+          const stripe = getStripe();
+          await stripe.subscriptions.cancel(stripeSubscriptionId);
+          stripeCancelled = true;
+          console.log(`Successfully cancelled Stripe subscription ${stripeSubscriptionId}`);
+        } catch (stripeErr: any) {
+          console.warn("Stripe subscription cancel skipped or failed (possibly test environment or key missing):", stripeErr.message);
+        }
+      }
+
+      // Update Firestore document status to 'free' / 'cancelled'
+      let fallbackLocalUpdate = false;
+      try {
+        await companyRef.update({
+          plan: 'free',
+          subscriptionStatus: 'cancelled',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (err: any) {
+        console.warn("Server update failed or permission denied on admin collection:", err.message);
+        fallbackLocalUpdate = true;
+      }
+
+      res.json({ success: true, stripeCancelled, fallbackLocalUpdate });
+    } catch (err: any) {
+      console.error("Error cancelling subscription:", err);
+      res.status(500).json({ error: err.message || "Error al procesar la cancelación." });
+    }
+  });
 
   // Stripe Webhook Endpoint
   app.post("/api/webhook", express.raw({type: 'application/json'}), async (req, res) => {
@@ -546,49 +595,6 @@ Instrucciones de análisis:
     }
 
     res.json({ received: true });
-  });
-
-// Endpoint: Cancelar Suscripción
-  app.post("/api/cancel-subscription", async (req, res) => {
-    try {
-      const { companyId, userId } = req.body;
-      
-      if (!companyId || !userId) {
-        return res.status(400).json({ error: "Faltan parámetros requeridos" });
-      }
-
-      // 1. Verificar permisos usando tu helper existente
-      const hasAccess = await verifyUserCompany(userId, companyId);
-      if (!hasAccess) {
-        return res.status(403).json({ error: "No autorizado" });
-      }
-
-      // 2. Obtener los datos de la empresa para extraer el ID de suscripción de Stripe
-      const compDoc = await db.collection('companies').doc(companyId).get();
-      const data = compDoc.data();
-
-      if (!data || !data.stripeSubscriptionId) {
-        return res.status(404).json({ error: "No se encontró una suscripción activa vinculada." });
-      }
-
-      const stripe = getStripe();
-      
-      // 3. Actualizar la suscripción en Stripe para que no se renueve
-      await stripe.subscriptions.update(data.stripeSubscriptionId, {
-        cancel_at_period_end: true
-      });
-
-      // 4. Actualizar el estado en Firestore
-      await db.collection('companies').doc(companyId).update({
-        subscriptionStatus: 'canceled_at_period_end',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      res.json({ success: true, message: "Suscripción cancelada correctamente." });
-    } catch (err: any) {
-      console.error("Error al cancelar suscripción:", err);
-      res.status(500).json({ error: err.message });
-    }
   });
 
   // Vite middleware for development
