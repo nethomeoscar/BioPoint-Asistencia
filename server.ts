@@ -548,6 +548,49 @@ Instrucciones de análisis:
     res.json({ received: true });
   });
 
+// Endpoint: Cancelar Suscripción
+  app.post("/api/cancel-subscription", async (req, res) => {
+    try {
+      const { companyId, userId } = req.body;
+      
+      if (!companyId || !userId) {
+        return res.status(400).json({ error: "Faltan parámetros requeridos" });
+      }
+
+      // 1. Verificar permisos usando tu helper existente
+      const hasAccess = await verifyUserCompany(userId, companyId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "No autorizado" });
+      }
+
+      // 2. Obtener los datos de la empresa para extraer el ID de suscripción de Stripe
+      const compDoc = await db.collection('companies').doc(companyId).get();
+      const data = compDoc.data();
+
+      if (!data || !data.stripeSubscriptionId) {
+        return res.status(404).json({ error: "No se encontró una suscripción activa vinculada." });
+      }
+
+      const stripe = getStripe();
+      
+      // 3. Actualizar la suscripción en Stripe para que no se renueve
+      await stripe.subscriptions.update(data.stripeSubscriptionId, {
+        cancel_at_period_end: true
+      });
+
+      // 4. Actualizar el estado en Firestore
+      await db.collection('companies').doc(companyId).update({
+        subscriptionStatus: 'canceled_at_period_end',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      res.json({ success: true, message: "Suscripción cancelada correctamente." });
+    } catch (err: any) {
+      console.error("Error al cancelar suscripción:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
