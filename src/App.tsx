@@ -64,17 +64,7 @@ import {
   signInAnonymously,
   signOut 
 } from 'firebase/auth';
-//import firebaseConfig from '../firebase-applet-config.json';
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  firestoreDatabaseId: import.meta.env.VITE_FIRESTORE_DATABASE_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-};
+import firebaseConfig from '../firebase-applet-config.json';
 
 // Face API Imports
 import * as faceapi from 'face-api.js';
@@ -150,13 +140,22 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-
   // Load Models
   useEffect(() => {
     const loadModels = async () => {
       try {
+        // Set CPU backend to avoid sandboxed iframe WebGL context/readPixels coordinate bugs (returns null/NaN coordinates)
+        try {
+          if (faceapi && faceapi.tf && typeof faceapi.tf.setBackend === 'function') {
+            await faceapi.tf.setBackend('cpu');
+            console.log("Successfully set face-api tfjs backend to CPU");
+          }
+        } catch (tfErr) {
+          console.warn("Failed to force CPU backend, falling back:", tfErr);
+        }
+
         // Use official weights from the author
-        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        const MODEL_URL = '/models';
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -501,6 +500,8 @@ export default function App() {
             key="employees"
             employees={employees}
             companyId={companyId!}
+            companyData={companyData}
+            setCompanyData={setCompanyData}
             onBack={() => setView('dashboard')}
             isModelsLoaded={isModelsLoaded}
           />
@@ -570,7 +571,7 @@ function LoginView({ onLogin, isLoading, onCancel, onTutorials }: any) {
         </button>
 
         <div className="mt-10 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
-           Powered by CarriotBrain Technology
+           Powered by BioPoint Technology
         </div>
       </div>
     </motion.div>
@@ -731,6 +732,10 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
                 <span className="text-white font-bold">{employees.length}</span>
               </div>
               <div className="flex justify-between">
+                <span>Faltan de Enrolar:</span>
+                <span className="text-rose-400 font-bold">{Math.max(0, (companyData?.expectedEmployeesCount || employees.length) - employees.filter(e => e.faceDescriptor).length)}</span>
+              </div>
+              <div className="flex justify-between">
                 <span>Asistencias Hoy:</span>
                 <span className="text-white font-bold">
                   {records.filter(r => r.date === new Date().toISOString().split('T')[0]).length}
@@ -753,7 +758,7 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
                 ? (isTrialActive ? 'Ver Planes de Pago' : 'Suscribirse Ahora') 
                 : 'Cambiar de Plan'}
             </button>
-          
+
             <div className="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
               <UserCircle2 className="w-40 h-40" />
             </div>
@@ -762,7 +767,7 @@ function DashboardView({ user, companyData, onNavigate, onLogout, onPair, isMode
       </div>
 
       <footer className="flex justify-between items-center text-slate-400 text-[10px] font-bold uppercase tracking-widest border-t border-slate-100 pt-8">
-        <p>© 2026 CarriotBrain Tech - v3.0.0</p>
+        <p>© 2024 BioPoint Tech - v3.0.0</p>
         <div className="flex gap-6">
           <span className="flex items-center gap-1.5">MODELS: <strong className={cn(isModelsLoaded ? "text-green-500" : "text-amber-500")}>{isModelsLoaded ? 'READY' : 'LOADING'}</strong></span>
           <span className="flex items-center gap-1.5">DATABASE: <strong className="text-green-500">FIREBASE</strong></span>
@@ -825,121 +830,138 @@ function CameraView({ onBack, onTutorials, employees, records, companyId, isKios
 
   const handleRecognition = async () => {
     if (!videoRef.current || status !== 'scanning' || !isModelsLoaded) return;
+    if (videoRef.current.readyState < 2) return;
+
+    const vWidth = videoRef.current.videoWidth;
+    const vHeight = videoRef.current.videoHeight;
+    if (vWidth <= 0 || vHeight <= 0) return;
 
     if (!isTrialActive && isKiosk) {
       alert("Periodo de prueba terminado. Por favor contacte al administrador.");
       return;
     }
 
-    // Use TinyFaceDetector for performance
-    const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
+    try {
+      // Create a snapshot canvas to capture stable frame pixels and dimensions
+      const frameCanvas = document.createElement('canvas');
+      frameCanvas.width = vWidth;
+      frameCanvas.height = vHeight;
+      const ctx = frameCanvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(videoRef.current, 0, 0, vWidth, vHeight);
 
-    if (!detection) return;
+      // Use TinyFaceDetector for performance on the static canvas
+      const detection = await faceapi.detectSingleFace(frameCanvas, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
 
-    let bestMatch = null;
-    let minDistance = 0.55; // Common threshold for face-api
+      if (!detection) return;
 
-    employees.forEach(emp => {
-      if (emp.faceDescriptor) {
-        const distance = faceapi.euclideanDistance(detection.descriptor, new Float32Array(emp.faceDescriptor));
-        if (distance < minDistance) {
-          minDistance = distance;
-          bestMatch = emp;
+      let bestMatch = null;
+      let minDistance = 0.55; // Common threshold for face-api
+
+      employees.forEach(emp => {
+        if (emp.faceDescriptor) {
+          const distance = faceapi.euclideanDistance(detection.descriptor, new Float32Array(emp.faceDescriptor));
+          if (distance < minDistance) {
+            minDistance = distance;
+            bestMatch = emp;
+          }
         }
-      }
-    });
+      });
 
-    if (bestMatch) {
-      const now = new Date();
-      const currentTimeStr = format(now, "HH:mm");
-      let entryType: 'Entrada' | 'Salida' = now.getHours() < 13 ? 'Entrada' : 'Salida';
-      
-      // PREVENCIÓN DE DUPLICADOS: 
-      // Verificar si ya existe un registro para este empleado, del mismo tipo, en la última hora
-      const oneHourAgo = Date.now() - (60 * 60 * 1000);
-      const isDuplicate = records.some(r => 
-        r.name === bestMatch.name && 
-        r.type === entryType && 
-        r.timestamp > oneHourAgo
-      );
+      if (bestMatch) {
+        const now = new Date();
+        const currentTimeStr = format(now, "HH:mm");
+        let entryType: 'Entrada' | 'Salida' = now.getHours() < 13 ? 'Entrada' : 'Salida';
+        
+        // PREVENCIÓN DE DUPLICADOS: 
+        // Verificar si ya existe un registro para este empleado, del mismo tipo, en la última hora
+        const oneHourAgo = Date.now() - (60 * 60 * 1000);
+        const isDuplicate = records.some(r => 
+          r.name === bestMatch.name && 
+          r.type === entryType && 
+          r.timestamp > oneHourAgo
+        );
 
-      if (isDuplicate) {
-        setResult({
+        if (isDuplicate) {
+          setResult({
+            name: bestMatch.name,
+            department: bestMatch.department,
+            date: format(now, "yyyy-MM-dd"),
+            time: format(now, "HH:mm:ss"),
+            type: entryType,
+            status: 'Reconocido',
+            timestamp: Date.now(),
+            companyId: companyId!
+          } as Record);
+          setStatus('success'); // Mostramos éxito pero no guardamos en DB
+          
+          // Detener cámara momentáneamente
+          if (stream) stream.getTracks().forEach(t => t.stop());
+
+          setTimeout(() => {
+            setStatus('idle');
+            startCamera();
+            setResult(null);
+          }, 3000);
+          return;
+        }
+
+        let punctuality: 'A Tiempo' | 'Retraso' | 'Temprano' | 'Normal' = 'A Tiempo';
+
+        if (entryType === 'Entrada' && bestMatch.shiftStart) {
+          punctuality = currentTimeStr > bestMatch.shiftStart ? 'Retraso' : 'A Tiempo';
+        } else if (entryType === 'Salida' && bestMatch.shiftEnd) {
+          punctuality = currentTimeStr < bestMatch.shiftEnd ? 'Temprano' : 'Normal';
+        }
+
+        const newRecord: Record = {
           name: bestMatch.name,
           department: bestMatch.department,
           date: format(now, "yyyy-MM-dd"),
           time: format(now, "HH:mm:ss"),
-          type: entryType,
+          type: entryType, 
           status: 'Reconocido',
+          punctuality,
           timestamp: Date.now(),
           companyId: companyId!
-        } as Record);
-        setStatus('success'); // Mostramos éxito pero no guardamos en DB
-        
-        // Detener cámara momentáneamente
-        if (stream) stream.getTracks().forEach(t => t.stop());
+        };
 
-        setTimeout(() => {
-          setStatus('idle');
-          startCamera();
-          setResult(null);
-        }, 3000);
-        return;
+        try {
+          console.log("Saving attendance record:", newRecord);
+          await addDoc(collection(db, 'attendance'), newRecord);
+          setResult(newRecord);
+          setStatus('success');
+          if (stream) stream.getTracks().forEach(t => t.stop());
+
+          // Auto-reset after 3 seconds to allow the next person
+          setTimeout(() => {
+            setStatus('idle');
+            startCamera();
+            setResult(null);
+          }, 3000);
+        } catch (err) {
+          console.error("Attendance creation failed, retrying once...");
+          // Wait a bit and retry if it's a permission error (could be rules latency)
+          setTimeout(async () => {
+            try {
+               await addDoc(collection(db, 'attendance'), newRecord);
+               setResult(newRecord);
+               setStatus('success');
+               if (stream) if (videoRef.current?.srcObject instanceof MediaStream) (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+            } catch (retryErr) {
+               handleFirestoreError(retryErr, OperationType.CREATE, 'attendance');
+            }
+          }, 1500);
+        }
+      } else {
+        // After some time if no match, we can mark as failed
+        // For the demo, we fail immediately if no match found in this specific Frame check
+        // but usually we'd wait for N frames.
       }
-
-      let punctuality: 'A Tiempo' | 'Retraso' | 'Temprano' | 'Normal' = 'A Tiempo';
-
-      if (entryType === 'Entrada' && bestMatch.shiftStart) {
-        punctuality = currentTimeStr > bestMatch.shiftStart ? 'Retraso' : 'A Tiempo';
-      } else if (entryType === 'Salida' && bestMatch.shiftEnd) {
-        punctuality = currentTimeStr < bestMatch.shiftEnd ? 'Temprano' : 'Normal';
-      }
-
-      const newRecord: Record = {
-        name: bestMatch.name,
-        department: bestMatch.department,
-        date: format(now, "yyyy-MM-dd"),
-        time: format(now, "HH:mm:ss"),
-        type: entryType, 
-        status: 'Reconocido',
-        punctuality,
-        timestamp: Date.now(),
-        companyId: companyId!
-      };
-
-      try {
-        console.log("Saving attendance record:", newRecord);
-        await addDoc(collection(db, 'attendance'), newRecord);
-        setResult(newRecord);
-        setStatus('success');
-        if (stream) stream.getTracks().forEach(t => t.stop());
-
-        // Auto-reset after 3 seconds to allow the next person
-        setTimeout(() => {
-          setStatus('idle');
-          startCamera();
-          setResult(null);
-        }, 3000);
-      } catch (err) {
-        console.error("Attendance creation failed, retrying once...");
-        // Wait a bit and retry if it's a permission error (could be rules latency)
-        setTimeout(async () => {
-          try {
-             await addDoc(collection(db, 'attendance'), newRecord);
-             setResult(newRecord);
-             setStatus('success');
-             if (stream) if (videoRef.current?.srcObject instanceof MediaStream) (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-          } catch (retryErr) {
-             handleFirestoreError(retryErr, OperationType.CREATE, 'attendance');
-          }
-        }, 1500);
-      }
-    } else {
-      // After some time if no match, we can mark as failed
-      // For the demo, we fail immediately if no match found in this specific Frame check
-      // but usually we'd wait for N frames.
+    } catch (detectionErr) {
+      console.warn("Interpolated face-api frame error (Box.constructor / coordinates error):", detectionErr);
     }
   };
 
@@ -1024,6 +1046,10 @@ function CameraView({ onBack, onTutorials, employees, records, companyId, isKios
           autoPlay 
           playsInline 
           muted 
+          onPlay={(e) => {
+            e.currentTarget.width = e.currentTarget.videoWidth;
+            e.currentTarget.height = e.currentTarget.videoHeight;
+          }}
           className="w-full h-full object-cover rounded-[2rem] contrast-125 brightness-110"
         />
         
@@ -1180,10 +1206,33 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
       if (!isModelsLoaded) alert("Espera a que los modelos carguen...");
       return;
     }
+    if (videoRef.current.readyState < 2) {
+      alert("Espera a que la cámara inicie completamente...");
+      return;
+    }
+
+    const vWidth = videoRef.current.videoWidth;
+    const vHeight = videoRef.current.videoHeight;
+    if (vWidth <= 0 || vHeight <= 0) {
+      alert("La cámara no tiene dimensiones válidas aún...");
+      return;
+    }
+
     setIsCapturing(true);
     try {
       console.log("Detecting face...");
-      const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+      // Use a canvas snapshot to capture stable frame pixels and dimensions
+      const frameCanvas = document.createElement('canvas');
+      frameCanvas.width = vWidth;
+      frameCanvas.height = vHeight;
+      const ctx = frameCanvas.getContext('2d');
+      if (!ctx) {
+        alert("Error al inicializar el canvas de captura.");
+        return;
+      }
+      ctx.drawImage(videoRef.current, 0, 0, vWidth, vHeight);
+
+      const detection = await faceapi.detectSingleFace(frameCanvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
       
@@ -1265,7 +1314,10 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
       ) : (
         <div className="grid md:grid-cols-2 gap-8">
         <div className="bento-card overflow-hidden bg-slate-900 border-none aspect-video flex items-center justify-center relative shadow-2xl">
-          <video ref={videoRef} autoPlay muted playsInline className={cn("w-full h-full object-cover", capturedDescriptor && "opacity-50")} />
+          <video ref={videoRef} autoPlay muted playsInline onPlay={(e) => {
+            e.currentTarget.width = e.currentTarget.videoWidth;
+            e.currentTarget.height = e.currentTarget.videoHeight;
+          }} className={cn("w-full h-full object-cover", capturedDescriptor && "opacity-50")} />
           <AnimatePresence>
             {capturedDescriptor && (
               <motion.div 
@@ -1348,9 +1400,33 @@ function RegisterView({ onBack, onSuccess, companyId, isModelsLoaded, isLocked }
   );
 }
 
-function EmployeesListView({ employees, onBack, companyId, isModelsLoaded }: { employees: Employee[]; onBack: () => void; companyId: string | null; isModelsLoaded: boolean; key?: string }) {
+function EmployeesListView({ employees, onBack, companyId, isModelsLoaded, companyData, setCompanyData }: { employees: Employee[]; onBack: () => void; companyId: string | null; isModelsLoaded: boolean; companyData?: any; setCompanyData?: any; key?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
+
+  const [isEditingTotal, setIsEditingTotal] = useState(false);
+  const [tempTotal, setTempTotal] = useState(companyData?.expectedEmployeesCount?.toString() || employees.length.toString());
+
+  const handleUpdateTotal = async () => {
+    if (!companyId || !companyData) return;
+    const num = parseInt(tempTotal, 10);
+    if (isNaN(num) || num < 0) return;
+    try {
+      await updateDoc(doc(db, 'companies', companyId), {
+        expectedEmployeesCount: num
+      });
+      if (setCompanyData) {
+        setCompanyData({ ...companyData, expectedEmployeesCount: num });
+      }
+      setIsEditingTotal(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const expectedTotal = companyData?.expectedEmployeesCount || employees.length;
+  const enrolledCount = employees.filter(e => e.faceDescriptor).length;
+  const realPendingCount = Math.max(0, expectedTotal - enrolledCount);
 
   // Lotes / Batch Enrollment States
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -1397,13 +1473,29 @@ function EmployeesListView({ employees, onBack, companyId, isModelsLoaded }: { e
         const img = new Image();
         img.src = e.target.result as string;
         img.onload = async () => {
+          if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+            reject(new Error("Imagen sin dimensiones."));
+            return;
+          }
+          
+          // Use a canvas snapshot to capture stable image pixels and dimensions
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error("No se pudo iniciar contexto de canvas"));
+            return;
+          }
+          ctx.drawImage(img, 0, 0);
+
           try {
             if (!isModelsLoaded) {
               reject(new Error("Modelos de IA no cargados"));
               return;
             }
             
-            const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+            const detection = await faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
               .withFaceLandmarks()
               .withFaceDescriptor();
             
@@ -1551,34 +1643,65 @@ function EmployeesListView({ employees, onBack, companyId, isModelsLoaded }: { e
       </header>
 
       {/* Indicadores de Gestión de Personal */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-10">
+        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4 relative group">
+          <div className="p-3 bg-slate-50 text-slate-600 rounded-2xl shrink-0">
              <UserCircle2 className="w-6 h-6" />
           </div>
-          <div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Total de Empleados</span>
-            <h3 className="text-2xl font-black text-slate-800 mt-0.5">{employees.length}</h3>
+          <div className="flex-1">
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px] flex items-center gap-1">
+              Plantilla Laboral (Meta)
+            </span>
+            {isEditingTotal ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input 
+                  type="number"
+                  min="0"
+                  value={tempTotal}
+                  onChange={(e) => setTempTotal(e.target.value)}
+                  className="w-full px-2 py-1 text-sm font-bold border border-slate-200 rounded outline-none"
+                  autoFocus
+                />
+                <button onClick={handleUpdateTotal} className="text-indigo-600 bg-indigo-50 p-1.5 rounded hover:bg-indigo-100">
+                  <CheckCircle2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsEditingTotal(true)}>
+                <h3 className="text-2xl font-black text-slate-800 mt-0.5">{expectedTotal}</h3>
+                <span className="opacity-0 group-hover:opacity-100 text-slate-300 transition-opacity"><Sparkles className="w-4 h-4" /></span>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl shrink-0">
+             <UserPlus className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Registrados en Sistema</span>
+            <h3 className="text-2xl font-black text-indigo-600 mt-0.5">{employees.length}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl shrink-0">
               <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Enrolantes Biométricos</span>
-            <h3 className="text-2xl font-black text-emerald-600 mt-0.5">{employees.filter(e => e.faceDescriptor).length}</h3>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Enrolados Biométricamente</span>
+            <h3 className="text-2xl font-black text-emerald-600 mt-0.5">{enrolledCount}</h3>
           </div>
         </div>
 
         <div className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
+          <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl shrink-0">
              <XCircle className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Pendientes de Enrolar</span>
-            <h3 className="text-2xl font-black text-rose-600 mt-0.5">{employees.filter(e => !e.faceDescriptor).length}</h3>
+            <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Faltan por registrar</span>
+            <h3 className="text-2xl font-black text-rose-600 mt-0.5">{realPendingCount}</h3>
           </div>
         </div>
       </div>
@@ -2699,6 +2822,55 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<any | null>(null);
   const [paymentError, setPaymentError] = useState('');
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+
+  const handleCancelSubscription = async () => {
+    if (!companyId) return;
+    setIsProcessing(true);
+    setCancelError('');
+    try {
+      const res = await fetch("/api/cancel-subscription", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ companyId })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Ocurrió un error al cancelar la suscripción.");
+      }
+
+      // Sync Firestore directly from client as a fail-safe
+      try {
+        await updateDoc(doc(db, 'companies', companyId), {
+          plan: 'free',
+          subscriptionStatus: 'cancelled',
+          updatedAt: new Date().toISOString()
+        });
+      } catch (dbErr) {
+        console.warn("No se pudo actualizar Firestore desde el cliente:", dbErr);
+      }
+
+      if (setCompanyData) {
+        setCompanyData((prev: any) => ({
+          ...prev,
+          plan: 'free',
+          subscriptionStatus: 'cancelled'
+        }));
+      }
+
+      setShowCancelConfirmation(false);
+    } catch (err: any) {
+      console.error("Error al cancelar la suscripción:", err);
+      setCancelError(err.message || "Fallo al comunicar con el servidor.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
   
   const isTrialActive = companyData?.plan && companyData?.plan !== 'free'
     ? true
@@ -2796,43 +2968,6 @@ function PricingView({ companyData, companyId, onBack, setCompanyData }: { compa
     }
   };
 
-const handleCancelSubscription = async () => {
-    const confirmCancel = window.confirm("¿Estás seguro de que deseas cancelar tu suscripción? Podrás seguir usando las funciones premium hasta el final de tu ciclo de facturación actual.");
-    if (!confirmCancel) return;
-
-    setIsProcessing(true);
-    try {
-      const res = await fetch("/api/cancel-subscription", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          companyId,
-          userId: auth.currentUser?.uid // Asegúrate de tener importado 'auth' si no lo está a nivel global
-        })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Ocurrió un error al cancelar.");
-      }
-
-      alert("Suscripción cancelada exitosamente.");
-      
-      // Actualizar el estado local para reflejar el cambio inmediatamente
-      if (setCompanyData) {
-        setCompanyData((prev: any) => ({ ...prev, subscriptionStatus: 'canceled_at_period_end' }));
-      }
-
-    } catch (err: any) {
-      alert("Error al cancelar: " + err.message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -2862,44 +2997,25 @@ const handleCancelSubscription = async () => {
             </div>
           </div>
         ) : (
-          <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 mb-10 flex gap-4 items-center shadow-sm">
-            <div className="p-3 bg-indigo-100 text-indigo-750 rounded-xl">
-              <Crown className="w-4 h-4 shrink-0 text-indigo-600" />
+          <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 mb-10 flex flex-col md:flex-row gap-6 md:items-center justify-between shadow-sm">
+            <div className="flex gap-4 items-center text-left">
+              <div className="p-3 bg-indigo-100 text-indigo-750 rounded-xl">
+                <Crown className="w-4 h-4 shrink-0 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-xs text-indigo-950">Suscripción Activa</h3>
+                <p className="text-[11px] text-indigo-800 font-medium leading-relaxed mt-0.5">
+                  Actualmente tienes contratado el plan <strong className="capitalize">{companyData?.plan === 'basic' ? 'Básico' : companyData?.plan === 'standard' ? 'Estándar' : 'Completo'}</strong>. Puedes cambiar de plan o gestionar tu facturación en esta sección.
+                </p>
+              </div>
             </div>
-            <div className="text-left">
-              <h3 className="font-extrabold text-xs text-indigo-950">Suscripción Activa</h3>
-              <p className="text-[11px] text-indigo-800 font-medium leading-relaxed mt-0.5">
-                Actualmente tienes contratado el plan <strong className="capitalize">{companyData?.plan === 'basic' ? 'Básico' : companyData?.plan === 'standard' ? 'Estándar' : 'Completo'}</strong>. Puedes cambiar de plan o gestionar tu facturación en esta sección.
-              </p>
-            </div>
-          </div>
-		  )}
-		  
-		  //Botón cancelar Suscripción
-          <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 mb-10 flex gap-4 items-start shadow-sm">
-            <div className="p-3 bg-indigo-100 text-indigo-750 rounded-xl mt-1">
-              <Crown className="w-4 h-4 shrink-0 text-indigo-600" />
-            </div>
-            <div className="text-left flex-1">
-              <h3 className="font-extrabold text-xs text-indigo-950">Suscripción Activa</h3>
-              <p className="text-[11px] text-indigo-800 font-medium leading-relaxed mt-0.5 mb-3">
-                Actualmente tienes contratado el plan <strong className="capitalize">{companyData?.plan === 'basic' ? 'Básico' : companyData?.plan === 'standard' ? 'Estándar' : 'Completo'}</strong>. Puedes cambiar de plan o gestionar tu facturación en esta sección.
-              </p>
-              
-              {companyData?.subscriptionStatus === 'canceled_at_period_end' ? (
-                <span className="inline-block px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold uppercase tracking-wider">
-                  Se cancelará al terminar el periodo
-                </span>
-              ) : (
-                <button 
-                  onClick={handleCancelSubscription}
-                  disabled={isProcessing}
-                  className="px-4 py-2 bg-white text-rose-600 border border-rose-100 hover:bg-rose-50 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm disabled:opacity-50"
-                >
-                  {isProcessing ? 'Procesando...' : 'Cancelar Suscripción'}
-                </button>
-              )}
-            </div>
+            <button 
+              onClick={() => setShowCancelConfirmation(true)}
+              className="px-6 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-extrabold rounded-2xl border border-rose-200 uppercase tracking-wider transition-all shadow-sm shrink-0 flex items-center gap-2 cursor-pointer self-start md:self-auto"
+            >
+              <Trash2 className="w-4 h-4" />
+              Cancelar Suscripción
+            </button>
           </div>
         )}
 
@@ -2972,6 +3088,70 @@ const handleCancelSubscription = async () => {
 
       {/* Stripe Redirect Transition / Loading / Error Overlay */}
       <AnimatePresence>
+        {showCancelConfirmation && (
+          <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 border border-slate-100 text-center flex flex-col items-center"
+            >
+              <div className="space-y-6 my-4 flex flex-col items-center w-full">
+                <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+                  <XCircle className="w-10 h-10 animate-bounce" />
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-slate-800">
+                    ¿Cancelar Suscripción?
+                  </h3>
+                  <p className="text-xs text-indigo-650 font-extrabold uppercase tracking-widest">
+                    Plan actual: <strong className="capitalize font-black">{companyData?.plan === 'basic' ? 'Básico' : companyData?.plan === 'standard' ? 'Estándar' : 'Completo'}</strong>
+                  </p>
+                  <p className="text-xs text-slate-550 font-semibold max-w-sm leading-relaxed pt-2 text-center">
+                    Al cancelar, tu cuenta volverá al <strong className="text-slate-800 font-bold">Plan Gratuito / Periodo de Prueba</strong>.
+                  </p>
+                  <p className="text-[11px] text-slate-450 font-medium max-w-sm leading-normal">
+                    Se desactivarán las funciones premium como el analista de reportes BioPoint AI y el acceso completo a la API externa para integraciones.
+                  </p>
+                </div>
+
+                {cancelError && (
+                  <div className="p-4 bg-rose-50 border border-rose-100 text-rose-600 text-[11px] font-bold rounded-2xl text-left w-full break-all">
+                    ⚠️ {cancelError}
+                  </div>
+                )}
+
+                <div className="pt-4 flex gap-3 justify-center w-full">
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => {
+                      setShowCancelConfirmation(false);
+                      setCancelError('');
+                    }}
+                    className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs uppercase tracking-widest transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    Mantener Plan
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={handleCancelSubscription}
+                    className="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-rose-100 transition-all cursor-pointer flex justify-center items-center gap-2 disabled:opacity-50"
+                  >
+                    {isProcessing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Sí, Cancelar'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {selectedPlanForPayment && (
           <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
             <motion.div 
@@ -2994,7 +3174,7 @@ const handleCancelSubscription = async () => {
                       Conectando con Pasarela Segura
                     </h3>
                     <p className="text-xs text-indigo-600 font-extrabold uppercase tracking-widest">
-                      Plan {selectedPlanForPayment.name} - ${selectedPlanForPayment.price} MXN
+                      Plan {selectedPlanForPayment.name} - ${selectedPlanForPayment.price} USD
                     </p>
                     <p className="text-xs text-slate-550 font-semibold max-w-sm leading-relaxed pt-2 text-center">
                       Te estamos redirigiendo de forma segura al entorno oficial de <strong className="text-slate-800 font-bold">Stripe Checkout</strong> para completar tu suscripción.
